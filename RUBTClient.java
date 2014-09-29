@@ -1,4 +1,6 @@
 import java.io.*;
+import java.net.URL;
+
 
 
 public class RUBTClient {
@@ -13,11 +15,23 @@ public class RUBTClient {
 		String torrent_file = args[0];
 		String output_file = args[1];
 		
-		byte[] torrent = getBytesFromFile(torrent_file);
+		byte[] torrent_bytes = getBytesFromFile(torrent_file);
+		TorrentInfo torrent;
+		
+		try
+		{
+			torrent = new TorrentInfo(torrent_bytes);
+			
+		} catch(BencodingException e) {
+			
+		}
+		
+		
+		
 		
 	}
 	
-	//not my method. may have to rewrite if this is an issue.
+	//not my method. may have to rewrite if this is an issue but doubt it
 	private static byte[] getBytesFromFile(String file_name)
 	{
 		File file = new File(file_name);
