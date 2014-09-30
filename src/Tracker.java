@@ -31,10 +31,11 @@ public class Tracker {
 		this.port = 6881;
 	}
 
-	public String[] getPeerList() {
+	public String[] getPeerList() throws IOException {
 
 
 		HttpURLConnection conn = sendGet();
+
 		BufferedReader in = null;
 		StringBuffer response = null;
 
@@ -49,14 +50,15 @@ public class Tracker {
 				response.append(inputLine);
 			}
 
+
 			in.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
 
-		//print result
-		System.out.println(response.toString());
+
+		System.out.println("HTTP Response: " + response.toString());
 
 		return null;
 	}
@@ -68,12 +70,14 @@ public class Tracker {
 
 		try 
 		{
-			trackerURL = constructURL(torrent);
+			trackerURL = constructURL("started");
 			trackerURL.openConnection();
 
 			conn = (HttpURLConnection) trackerURL.openConnection();
 
 			conn.setRequestMethod("GET");
+			System.out.println("Response code: " + conn.getResponseCode());
+
 
 			return conn;
 		} catch (MalformedURLException e) {
@@ -84,7 +88,7 @@ public class Tracker {
 			e.printStackTrace();
 		} 
 
-		return null;
+		return conn;
 	}
 
 	private static String randomAlphaNumeric() {
@@ -99,13 +103,19 @@ public class Tracker {
 
 	}
 
-	private static URL constructURL(TorrentInfo torrent) throws MalformedURLException {
+	private static URL constructURL(String event) throws MalformedURLException {
 
 		String base_url = torrent.announce_url.toString();
-		String info_hash = bytesToHex(torrent.info_hash.array());
-		String get_url = base_url + "?" + "info_hash=" + info_hash + "?" + "peer_id=" + peer_id + "?" + "port=" + port + "?" + "downloaded=0" +"left=0";
-		//	System.out.println(get_url);
-		return new URL(get_url);
+		String escaped_info_hash = bytesToHex(torrent.info_hash.array());
+
+		String query = "?info_hash=" + escaped_info_hash + 
+				"&peer_id=" + peer_id +
+				"&downloaded=" + downloaded +
+				"&left=" + left +
+				"&event=" + event +
+				"&uploaded=" + uploaded;
+		System.out.println(base_url+query);
+				return new URL(base_url + query);
 	}
 
 	public static String bytesToHex(byte[] bytes) {
