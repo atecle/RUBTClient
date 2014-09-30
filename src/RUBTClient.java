@@ -27,7 +27,7 @@ public class RUBTClient {
 		}
 		
 		Tracker obj = new Tracker(torrent);
-		obj.sendGet();
+		obj.getPeerList();
 		
 	}
 	
