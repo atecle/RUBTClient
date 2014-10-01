@@ -16,24 +16,14 @@ public class Tracker {
 	private static final String ALPHA_NUMERIC_STRING = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
 
-	private static String info_hash;
-	private static String peer_id;
-	private static int port;
-	private static int uploaded;
-	private static int downloaded;
-	private static int left;
-
-
-	private static TorrentInfo torrent;
-
-	public static TorrentInfo getTorrentInfo() {
-		return torrent;
-	}
-
-	public static String getPeerId() {
-		return peer_id;
-	}
-
+	private String info_hash;
+	private String peer_id;
+	private String[] peer_list;
+	private int port;
+	private int uploaded;
+	private int downloaded;
+	private int left;
+	private TorrentInfo torrent;
 
 	public Tracker(TorrentInfo torr) {
 		this.torrent = torr;
@@ -42,38 +32,78 @@ public class Tracker {
 		this.downloaded = 0;
 		this.left = 0;
 		this.port = 6881;
+		this.peer_list = getPeerList();
 	}
 
-	public String[] getPeerList() throws IOException, BencodingException {
+	public TorrentInfo getTorrent() {
+		return torrent;
+	}
+
+	public String getPeerID() {
+		return peer_id;
+	}
+	
+	public int getUploaded() {
+		return uploaded;
+	}
+	
+	public int getDownloaded() {
+		return downloaded;
+	}
+	
+	public int getPort() {
+		return port;
+	}
+	
+	public int getLeft() {
+		return left;
+	}
+	
+	private String[] getPeerList() {
 
 		Bencoder2 decoder = new Bencoder2();
-		
+		String[] peer_list = null;
 		HttpURLConnection conn = sendGet();
+		InputStream in = null;
+		HashMap<Object, Object> map = null;
+		try {
+		in = conn.getInputStream();
 
-		InputStream in = conn.getInputStream();
-		BufferedInputStream buffer = new BufferedInputStream(in);
-		
-		StringBuffer response = null;
 		byte[] response_bytes = new byte[in.available()];
-		
+
 		in.read(response_bytes);
 		in.close();
+
+		map = (HashMap<Object, Object>) decoder.decode(response_bytes);
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (BencodingException e) {
+			e.printStackTrace();
+		}
 		
-		HashMap<Object, Object> map = (HashMap<Object, Object>) decoder.decode(response_bytes);
 		ToolKit kit = new ToolKit();
 		kit.print(map);
-		
+
 		//I'm seeing a Dictionary, the last key containing another dictionary with a key called peer_id, only showing one key though
 		//and it doesn't start with RUBT11.
 		//Line 54 might be the source of the issue, not sure if that's how I should be representing decoded response_bytes
-		
-		
+
+
 		//System.out.println("HTTP Response: " + response.toString());
 
-		return null;
+		return peer_list;
 	}
 
-	private static HttpURLConnection sendGet() {
+	public TorrentInfo getTorrentInfo() {
+		return torrent;
+	}
+
+	public String getPeerId() {
+		return peer_id;
+	}
+
+
+	private HttpURLConnection sendGet() {
 
 		URL trackerURL = null;
 		HttpURLConnection conn = null;
@@ -113,11 +143,21 @@ public class Tracker {
 
 	}
 
-	private static URL constructURL(String event) throws MalformedURLException {
+	/**
+	 * 
+	 * @param Event maps to "started", "completed", "stopped", or can be empty ""
+	 * @return URL to be sent to tracker
+	 * @throws MalformedURLException
+	 */
+	private URL constructURL(String event) throws MalformedURLException {
 
+		if (!event.equals("started") && !event.equals("completed") && !event.equals("stopped")) {
+			event = "";
+		}
+		
 		String base_url = torrent.announce_url.toString();
 		String escaped_info_hash = byteArrayToURLString(torrent.info_hash.array());
-		
+
 		String query = "?info_hash=" + escaped_info_hash + 
 				"&peer_id=" + peer_id +
 				"&downloaded=" + downloaded +
@@ -125,48 +165,52 @@ public class Tracker {
 				"&port=" + port +
 				"&event=" + event +
 				"&uploaded=" + uploaded;
-		
-				return new URL(base_url + query);
+
+		return new URL(base_url + query);
 	}
 
-	//Found online here - http://www.java2s.com/Code/Android/Network/ConvertabytearraytoaURLencodedstring.htm 
-	public static String byteArrayToURLString(byte in[]) {
-	    byte ch = 0x00;
-	    int i = 0;
-	    if (in == null || in.length <= 0)
-	      return null;
+	/**
+	 * Used to escape SHA-1 info_hash so it can be sent to tracker via http get
+	 * @param A byte[] array
+	 * @return A URL safe string
+	 */
+	private static String byteArrayToURLString(byte in[]) {
+		byte ch = 0x00;
+		int i = 0;
+		if (in == null || in.length <= 0)
+			return null;
 
-	    String pseudo[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-	        "A", "B", "C", "D", "E", "F" };
-	    StringBuffer out = new StringBuffer(in.length * 2);
+		String pseudo[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+				"A", "B", "C", "D", "E", "F" };
+		StringBuffer out = new StringBuffer(in.length * 2);
 
-	    while (i < in.length) {
-	      // First check to see if we need ASCII or HEX
-	      if ((in[i] >= '0' && in[i] <= '9')
-	          || (in[i] >= 'a' && in[i] <= 'z')
-	          || (in[i] >= 'A' && in[i] <= 'Z') || in[i] == '$'
-	          || in[i] == '-' || in[i] == '_' || in[i] == '.'
-	          || in[i] == '!') {
-	        out.append((char) in[i]);
-	        i++;
-	      } else {
-	        out.append('%');
-	        ch = (byte) (in[i] & 0xF0); // Strip off high nibble
-	        ch = (byte) (ch >>> 4); // shift the bits down
-	        ch = (byte) (ch & 0x0F); // must do this is high order bit is
-	        // on!
-	        out.append(pseudo[(int) ch]); // convert the nibble to a
-	        // String Character
-	        ch = (byte) (in[i] & 0x0F); // Strip off low nibble
-	        out.append(pseudo[(int) ch]); // convert the nibble to a
-	        // String Character
-	        i++;
-	      }
-	    }
+		while (i < in.length) {
+			// First check to see if we need ASCII or HEX
+			if ((in[i] >= '0' && in[i] <= '9')
+					|| (in[i] >= 'a' && in[i] <= 'z')
+					|| (in[i] >= 'A' && in[i] <= 'Z') || in[i] == '$'
+					|| in[i] == '-' || in[i] == '_' || in[i] == '.'
+					|| in[i] == '!') {
+				out.append((char) in[i]);
+				i++;
+			} else {
+				out.append('%');
+				ch = (byte) (in[i] & 0xF0); // Strip off high nibble
+				ch = (byte) (ch >>> 4); // shift the bits down
+				ch = (byte) (ch & 0x0F); // must do this is high order bit is
+				// on!
+				out.append(pseudo[(int) ch]); // convert the nibble to a
+				// String Character
+				ch = (byte) (in[i] & 0x0F); // Strip off low nibble
+				out.append(pseudo[(int) ch]); // convert the nibble to a
+				// String Character
+				i++;
+			}
+		}
 
-	    String rslt = new String(out);
+		String rslt = new String(out);
 
-	    return rslt;
+		return rslt;
 
-	  }
+	}
 }

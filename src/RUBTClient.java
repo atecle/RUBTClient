@@ -23,11 +23,11 @@ public class RUBTClient {
 			torrent = new TorrentInfo(torrent_bytes);
 			
 		} catch(BencodingException e) {
-			
+			e.printStackTrace();
 		}
 		
 		Tracker obj = new Tracker(torrent);
-		obj.getPeerList();
+		//obj.getPeerList();
 
 		PeerConnection peerConnection = new PeerConnection("128.6.171.131", 6135, obj);
 		peerConnection.openConnection();
@@ -35,7 +35,11 @@ public class RUBTClient {
 		peerConnection.closeConnection();
 	}
 	
-	//not my method. may have to rewrite if this is an issue but doubt it
+	/**
+	 * 
+	 * @param file_name 
+	 * @return
+	 */
 	private static byte[] getBytesFromFile(String file_name)
 	{
 		File file = new File(file_name);
