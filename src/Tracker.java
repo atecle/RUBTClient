@@ -6,6 +6,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.AbstractList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -54,18 +56,25 @@ public class Tracker {
 	private String[] getPeerList() {
 
 		Bencoder2 decoder = new Bencoder2();
-		String[] peer_list = null;
-		HttpURLConnection conn = sendGet();
+		
 		InputStream in = null;
+		String[] peer_list = null;
 		HashMap<Object, Object> map = null;
+		HttpURLConnection conn = sendGet();
+		
+		byte[] b = null;
 		try {
+		
+		
 		in = conn.getInputStream();
 
 		byte[] response_bytes = new byte[in.available()];
-
+		
 		in.read(response_bytes);
+		b = response_bytes;
 		in.close();
-
+		
+		
 		map = (HashMap<Object, Object>) decoder.decode(response_bytes);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -74,11 +83,8 @@ public class Tracker {
 		}
 		
 		ToolKit kit = new ToolKit();
-		kit.print(map);
-
-		//I'm seeing a Dictionary, the last key containing another dictionary with a key called peer_id, only showing one key though
-		//and it doesn't start with RUBT11.
-		//Line 54 might be the source of the issue, not sure if that's how I should be representing decoded response_bytes
+		//kit.printList((AbstractList) map.get("peers"), 0);
+		
 
 
 		//System.out.println("HTTP Response: " + response.toString());
@@ -149,9 +155,9 @@ public class Tracker {
 		
 		String base_url = torrent.announce_url.toString();
 		String escaped_info_hash = byteArrayToURLString(torrent.info_hash.array());
-
+		String escaped_peer_id = byteArrayToURLString(peer_id.getBytes());
 		String query = "?info_hash=" + escaped_info_hash + 
-				"&peer_id=" + peer_id +
+				"&peer_id=" + escaped_peer_id +
 				"&downloaded=" + downloaded +
 				"&left=" + left +
 				"&port=" + port +
