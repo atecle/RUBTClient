@@ -26,6 +26,14 @@ public class Tracker {
 
 	private static TorrentInfo torrent;
 
+	public static TorrentInfo getTorrentInfo() {
+		return torrent;
+	}
+
+	public static String getPeerId() {
+		return peer_id;
+	}
+
 
 	public Tracker(TorrentInfo torr) {
 		this.torrent = torr;

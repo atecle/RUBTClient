@@ -28,7 +28,11 @@ public class RUBTClient {
 		
 		Tracker obj = new Tracker(torrent);
 		obj.getPeerList();
-		
+
+		PeerConnection peerConnection = new PeerConnection("128.6.171.131", 6135, obj);
+		peerConnection.openConnection();
+		peerConnection.doHandShake();
+		peerConnection.closeConnection();
 	}
 	
 	//not my method. may have to rewrite if this is an issue but doubt it
