@@ -34,14 +34,6 @@ public class Tracker {
 		this.port = 6881;
 		this.peer_list = getPeerList();
 	}
-
-	public TorrentInfo getTorrent() {
-		return torrent;
-	}
-
-	public String getPeerID() {
-		return peer_id;
-	}
 	
 	public int getUploaded() {
 		return uploaded;
