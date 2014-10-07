@@ -3,11 +3,11 @@ public class Peer {
 
 	private static String ip;
 	private static String peer_id;
-	private static String port;
+	private static int port;
 	
 	
 
-	public Peer(String ip, String peer_id, String port) {
+	public Peer(String ip, String peer_id, int port) {
 		
 		this.ip = ip;
 		this.peer_id = peer_id;
@@ -22,7 +22,7 @@ public class Peer {
 		return peer_id;
 	}
 	
-	public String getPort() {
+	public int getPort() {
 		return port;
 	}
 	

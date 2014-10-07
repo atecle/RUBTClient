@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.URL;
+import java.util.ArrayList;
 
 
 
@@ -27,9 +28,10 @@ public class RUBTClient {
 		}
 		
 		Tracker obj = new Tracker(torrent);
-		//obj.getPeerList();
-
-		//PeerConnection peerConnection = new PeerConnection("128.6.171.131", 6135, obj);
+		
+		ArrayList<Peer> test = obj.getPeerList();
+		//Peer test_peer = test.get(1);
+		//PeerConnection peerConnection = new PeerConnection(test_peer.getIP(), test_peer.getPort(), obj);
 		//peerConnection.openConnection();
 		//peerConnection.doHandShake();
 		//peerConnection.closeConnection();

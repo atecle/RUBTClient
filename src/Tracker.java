@@ -81,7 +81,7 @@ public class Tracker {
 		this.downloaded = 0;
 		this.left = 0;
 		this.port = 6881;
-		this.peer_list = getPeerList();
+		this.peer_list = getPeers();
 	}
 
 	public int getUploaded() {
@@ -100,13 +100,16 @@ public class Tracker {
 		return left;
 	}
 	
+	public ArrayList<Peer> getPeerList() {
+		return peer_list;
+	}
 	
 	public HashMap connect() {
 		
 		return null;
 	}
 
-	private ArrayList<Peer> getPeerList() {
+	private ArrayList<Peer> getPeers() {
 		
 		InputStream in = null;
 		ArrayList<Peer> peer_list = new ArrayList<Peer>(20);
@@ -134,18 +137,14 @@ public class Tracker {
 			e.printStackTrace();
 		}
 
-		
-		ArrayList l = (ArrayList)map.get(PEERS_KEY);
-		HashMap test = (HashMap)l.get(1);
-		String bitch = new String(((ByteBuffer)test.get(PEER_ID_KEY)).array());
-		
+	
 		ArrayList list = (ArrayList)map.get(PEERS_KEY);
 		
 		for (int i = 0; i < list.size(); i++) {
 			HashMap t = (HashMap) list.get(i);
 			String peer_id = new String(((ByteBuffer)t.get(PEER_ID_KEY)).array());
 			String peer_ip = new String(((ByteBuffer)t.get(PEER_IP_KEY)).array());
-			String peer_port = new String(((ByteBuffer)t.get(PEER_IP_KEY)).array());
+			int peer_port = Integer.parseInt(new String(((ByteBuffer)t.get(PEER_IP_KEY)).array()));
 			Peer peer = new Peer(peer_ip, peer_id, peer_port);
 			peer_list.add(peer);
 		}
