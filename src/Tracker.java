@@ -109,7 +109,7 @@ public class Tracker {
 	private ArrayList<Peer> getPeerList() {
 		
 		InputStream in = null;
-		ArrayList<Peer> peer_list = null;
+		ArrayList<Peer> peer_list = new ArrayList<Peer>(20);
 		HashMap map = null;
 		HttpURLConnection conn = sendGet();
 
@@ -137,8 +137,18 @@ public class Tracker {
 		
 		ArrayList l = (ArrayList)map.get(PEERS_KEY);
 		HashMap test = (HashMap)l.get(1);
-		String f = new String(((ByteBuffer)test.get(PEER_ID_KEY)).array());
-		System.out.println(f);
+		String bitch = new String(((ByteBuffer)test.get(PEER_ID_KEY)).array());
+		
+		ArrayList list = (ArrayList)map.get(PEERS_KEY);
+		
+		for (int i = 0; i < list.size(); i++) {
+			HashMap t = (HashMap) list.get(i);
+			String peer_id = new String(((ByteBuffer)t.get(PEER_ID_KEY)).array());
+			String peer_ip = new String(((ByteBuffer)t.get(PEER_IP_KEY)).array());
+			String peer_port = new String(((ByteBuffer)t.get(PEER_IP_KEY)).array());
+			Peer peer = new Peer(peer_ip, peer_id, peer_port);
+			peer_list.add(peer);
+		}
 
 
 		return peer_list;
