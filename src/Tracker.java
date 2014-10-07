@@ -103,6 +103,10 @@ public class Tracker {
 	public ArrayList<Peer> getPeerList() {
 		return peer_list;
 	}
+
+    public String getInfoHash() {
+        return info_hash;
+    }
 	
 	public HashMap connect() {
 		
