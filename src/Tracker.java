@@ -148,9 +148,7 @@ public class Tracker {
 			HashMap t = (HashMap) list.get(i);
 			String peer_id = new String(((ByteBuffer)t.get(PEER_ID_KEY)).array());
 			String peer_ip = new String(((ByteBuffer)t.get(PEER_IP_KEY)).array());
-			String peer_port_t = new String(((ByteBuffer)t.get(PEER_PORT_KEY)).array());
-			
-			int peer_port = Integer.parseInt(peer_port_t);
+			int peer_port = (Integer) t.get(PEER_PORT_KEY);
 			Peer peer = new Peer(peer_ip, peer_id, peer_port);
 			peer_list.add(peer);
 		}
