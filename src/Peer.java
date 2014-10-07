@@ -1,9 +1,9 @@
 
 public class Peer {
 
-	private static String ip;
-	private static String peer_id;
-	private static int port;
+	private String ip;
+	private String peer_id;
+	private int port;
 	
 	
 
@@ -26,5 +26,8 @@ public class Peer {
 		return port;
 	}
 	
-	
+	@Override
+	public String toString() {
+		return String.format("ID: %s\nIP: %s\nPort: %d", peer_id, ip, port);
+	}
 }

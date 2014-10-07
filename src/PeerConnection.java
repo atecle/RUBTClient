@@ -31,6 +31,8 @@ public class PeerConnection {
 			header.put((byte)0);
 		header.put(tracker.getTorrentInfo().info_hash.array());
 		header.put(tracker.getPeerId().getBytes());
+		System.out.println("SHA: " + tracker.getTorrentInfo().info_hash.array());
+		System.out.println("My Peer ID: " + tracker.getPeerId());
 		return header;
 	}
 
@@ -48,19 +50,23 @@ public class PeerConnection {
 
 	public boolean doHandShake() {
 		try {
+			System.out.println("Starting handshake...");
 			out.print(makeHeader(tracker).array());
+			System.out.println("Sent handshake");
 
+			System.out.println("Getting response...");
 			byte[] response = new byte[HEADER_SIZE];
 			in.read(response);
-			ByteBuffer hs = ByteBuffer.allocate(HEADER_SIZE);
-			hs.put(response);
+			ByteBuffer hs = ByteBuffer.wrap(response);
+			System.out.println("Recieved response " + response);
 
 			int length = hs.get();
+			System.out.println("Length: " + length);
 
 			byte[] protocol = new byte[PROTOCOL.length()];
 			hs.get(protocol);
 			String protocolStr = new String(protocol, "UTF-8");
-			System.out.println(protocolStr);
+			System.out.println("Protocol: " + protocolStr);
 
 			byte[] reserved = new byte[8];
 			hs.get(reserved);
@@ -68,18 +74,33 @@ public class PeerConnection {
 			byte[] sha = new byte[20];
 			hs.get(sha);
 			String shaStr = new String(sha, "UTF-8");
+			System.out.println("SHA: " + shaStr);
 
 			byte[] peerIdByte = new byte[20];
 			hs.get(peerIdByte);
 			String peerIdStr = new String(peerIdByte, "UTF-8");
+			System.out.println("Peer ID: " + peerIdStr);
 
-			if (shaStr.equals(tracker.getInfoHash()) && peerIdStr.equals(peerId))
+			if (shaStr.equals(tracker.getTorrentInfo().info_hash) && peerIdStr.equals(peerId))
 				return true;
 			else
 				return false;
 		} catch (IOException e) {
 			System.err.println("IO error: " + e.getMessage());
 			return false;
+		}
+	}
+
+	public void get() {
+		try {
+			int length = in.readInt();
+			byte[] response = new byte[length];
+			in.read(response);
+			ByteBuffer res = ByteBuffer.allocate(length);
+			res.put(response);
+			int messageId = res.get();
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
 		}
 	}
 
