@@ -29,7 +29,7 @@ public class PeerConnection {
 		ByteArrayOutputStream outBytes = null;
 		try {
 			outBytes = new ByteArrayOutputStream();
-			outBytes.write(PROTOCOL.length());
+			outBytes.write((byte)PROTOCOL.length());
 			outBytes.write(PROTOCOL.getBytes("UTF-8"));
 
 			for (int i = 0; i < 8; i++)
@@ -40,7 +40,9 @@ public class PeerConnection {
 
 			System.out.println("SHA: " + tracker.getTorrentInfo().info_hash.array());
 			System.out.println("My Peer ID: " + tracker.getPeerId());
-		} catch (Exception e) {e.printStackTrace();}
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 
 		return outBytes.toByteArray();
 	}
@@ -55,7 +57,6 @@ public class PeerConnection {
 		} catch (IOException e) {
 			System.err.println("IO error: " + e.getMessage());
 		}
-
 	}
 
 	public boolean doHandShake() {
@@ -70,7 +71,8 @@ public class PeerConnection {
 			in.read(response);
 			ByteBuffer hs = ByteBuffer.wrap(response);
 			System.out.println("Recieved response " + response);
-			System.out.println(Arrays.toString(response));
+			System.out.println(new String(response, "UTF-8"));
+
 			int length = hs.get();
 			System.out.println("Length: " + length);
 
@@ -81,6 +83,7 @@ public class PeerConnection {
 
 			byte[] reserved = new byte[8];
 			hs.get(reserved);
+			System.out.println("Reserved bytes " + Arrays.toString(reserved));
 
 			byte[] sha = new byte[20];
 			hs.get(sha);
@@ -92,7 +95,17 @@ public class PeerConnection {
 			String peerIdStr = new String(peerIdByte, "UTF-8");
 			System.out.println("Peer ID: " + peerIdStr);
 
-			if (shaStr.equals(tracker.getTorrentInfo().info_hash) && peerIdStr.equals(peerId))
+			boolean sameSha = true;
+
+			if (sha.length != tracker.getTorrentInfo().info_hash.array().length)
+				sameSha = false;
+
+			for (int i = 0; i < sha.length; i++) {
+				if (sha[i] != tracker.getTorrentInfo().info_hash.array()[i])
+					sameSha = false;
+			}
+
+			if (sameSha && peerIdStr.equals(peerId))
 				return true;
 			else
 				return false;
@@ -116,45 +129,69 @@ public class PeerConnection {
 	}
 
 	public void sendKeepAlive() {
-		ByteBuffer ka = ByteBuffer.allocate(4);
-		ka.putInt(0);
-		out.print(ka.array());
+		try {
+			ByteBuffer ka = ByteBuffer.allocate(4);
+			ka.putInt(0);
+			out.write(ka.array());
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 	}
 
 	public void sendChoke() {
-		ByteBuffer c = ByteBuffer.allocate(5);
-		c.putInt(1);
-		c.put((byte)0);
-		out.print(c.array());
+		try {
+			ByteBuffer c = ByteBuffer.allocate(5);
+			c.putInt(1);
+			c.put((byte)0);
+			out.write(c.array());
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 	}
 
 	public void sendUnChoke() {
-		ByteBuffer uc = ByteBuffer.allocate(5);
-		uc.putInt(1);
-		uc.put((byte)1);
-		out.print(uc.array());
+		try {
+			ByteBuffer uc = ByteBuffer.allocate(5);
+			uc.putInt(1);
+			uc.put((byte)1);
+			out.write(uc.array());
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 	}
 
 	public void sendInterested() {
-		ByteBuffer i = ByteBuffer.allocate(5);
-		i.putInt(1);
-		i.put((byte)2);
-		out.print(i.array());
+		try {
+			ByteBuffer i = ByteBuffer.allocate(5);
+			i.putInt(1);
+			i.put((byte)2);
+			out.write(i.array());
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 	}
 
 	public void sendUnInterested() {
-		ByteBuffer ui = ByteBuffer.allocate(5);
-		ui.putInt(1);
-		ui.put((byte)3);
-		out.print(ui.array());
+		try {
+			ByteBuffer ui = ByteBuffer.allocate(5);
+			ui.putInt(1);
+			ui.put((byte)3);
+			out.write(ui.array());
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 	}
 
 	public void sendHave(int index) {
-		ByteBuffer h = ByteBuffer.allocate(9);
-		h.putInt(5);
-		h.put((byte)4);
-		h.putInt(index);
-		out.print(h.array());
+		try {
+			ByteBuffer h = ByteBuffer.allocate(9);
+			h.putInt(5);
+			h.put((byte)4);
+			h.putInt(index);
+			out.write(h.array());
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 	}
 
 	public void sendRequest(int index, int begin) {
@@ -162,23 +199,31 @@ public class PeerConnection {
 	}
 
 	public void sendRequest(int index, int begin, int length) {
-		ByteBuffer r = ByteBuffer.allocate(17);
-		r.putInt(13);
-		r.put((byte)6);
-		r.putInt(index);
-		r.putInt(begin);
-		r.putInt(length);
-		out.print(r.array());
+		try {
+			ByteBuffer r = ByteBuffer.allocate(17);
+			r.putInt(13);
+			r.put((byte)6);
+			r.putInt(index);
+			r.putInt(begin);
+			r.putInt(length);
+			out.write(r.array());
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 	}
 
 	public void sendPiece(int index, int begin, byte[] block) {
-		ByteBuffer p = ByteBuffer.allocate(13 + block.length);
-		p.putInt(9 + block.length);
-		p.put((byte)7);
-		p.putInt(index);
-		p.putInt(begin);
-		p.put(block);
-		out.print(p.array());
+		try {
+			ByteBuffer p = ByteBuffer.allocate(13 + block.length);
+			p.putInt(9 + block.length);
+			p.put((byte)7);
+			p.putInt(index);
+			p.putInt(begin);
+			p.put(block);
+			out.write(p.array());
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
 	}
 
 	public void closeConnection() {
