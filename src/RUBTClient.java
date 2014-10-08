@@ -1,3 +1,6 @@
+
+//Adam Tecle & Matt Robinson
+
 import java.io.*;
 import java.nio.*;
 import java.net.URL;
@@ -41,6 +44,19 @@ public class RUBTClient {
 		System.out.println("Number of pieces: " + num_pieces);
 		System.out.println("Number of blocks: " + piece_length/16384);
 		ArrayList<Peer> test = obj.getPeerList();
+		Peer peer = null;
+		for (int i = 0; i < test.size(); i++) {
+			Peer temp = test.get(i);
+			if (temp.getPeerID().substring(0, 7).equals("-AZ5400")) {
+				peer = temp;
+			}
+		}
+		
+		/*if (peer == null) {
+			System.out.println("Could not find 352 seeder");
+			System.exit(1);
+		}*/
+		
 		Peer test_peer = new Peer("128.6.171.131", "-AZ5400-Py3jGhZ69hR4", 61350);
 		PeerConnection peerConnection = new PeerConnection(test_peer, obj);
 		peerConnection.openConnection();
