@@ -119,15 +119,30 @@ public class PeerConnection {
 		try {
 			int length = in.readInt();
 			byte[] response = new byte[length];
-			System.out.println(length);
 			in.read(response);
-			//System.out.println(Arrays.toString(response));
 			ByteBuffer res = ByteBuffer.wrap(response);
 			int messageId = res.get();
-			System.out.println(messageId);
 		} catch (IOException e) {
 			System.err.println("IO error: " + e.getMessage());
 		}
+	}
+
+	public byte[] getPiece() {
+		byte[] block = null;
+		try {
+			int length = in.readInt();
+			byte[] response = new byte[length];
+			in.read(response);
+			ByteBuffer res = ByteBuffer.wrap(response);
+			int messageId = res.get();
+			int index = res.getInt();
+			int begin = res.getInt();
+			block = new byte[length - 9];
+			res.get(block);
+		} catch (IOException e) {
+			System.err.println("IO error: " + e.getMessage());
+		}
+		return block;
 	}
 
 	public void sendKeepAlive() {

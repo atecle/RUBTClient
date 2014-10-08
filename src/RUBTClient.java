@@ -1,6 +1,8 @@
 import java.io.*;
+import java.nio.*;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 
 
@@ -28,6 +30,14 @@ public class RUBTClient {
 		}
 		
 		Tracker obj = new Tracker(torrent);
+		int file_length = obj.getTorrentInfo().file_length;
+		int piece_length = obj.getTorrentInfo().piece_length;
+		ByteBuffer[] piece_hashes = obj.getTorrentInfo().piece_hashes;
+		int num_pieces = piece_hashes.length;
+		System.out.println("File size: " + file_length);
+		System.out.println("Piece size: " + piece_length);
+		System.out.println("Number of pieces: " + num_pieces);
+		System.out.println("Number of blocks: " + piece_length/16384);
 		ArrayList<Peer> test = obj.getPeerList();
 		Peer test_peer = new Peer("128.6.171.131", "-AZ5400-Py3jGhZ69hR4", 61350);
 		PeerConnection peerConnection = new PeerConnection(test_peer, obj);
@@ -36,8 +46,32 @@ public class RUBTClient {
 		peerConnection.get();
 		peerConnection.sendInterested();
 		peerConnection.get();
-		peerConnection.sendRequest(0, 0);
-		peerConnection.get();
+		FileOutputStream f = new FileOutputStream(output_file);
+		for (int i = 0; i < num_pieces; i++) {
+			byte[] pieceSHA = piece_hashes[i].array();
+
+			System.out.println("Getting piece " + i + ", block 1");
+			peerConnection.sendRequest(i, 0);
+			byte[] block = peerConnection.getPiece();
+			for (int j = 0; j < block.length; j++) {
+				if (block[j] != pieceSHA[j]) {
+					System.out.println("ERROR");
+					return;
+				}
+			}
+			f.write(block, i*piece_length, block.length);
+
+			System.out.println("Getting piece " + i + ", block 2");
+			peerConnection.sendRequest(i, 16384);
+			block = peerConnection.getPiece();
+			for (int j = 0; j < block.length; j++) {
+				if (block[j] != pieceSHA[block.length+j]) {
+					System.out.println("ERROR");
+					return;
+				}
+			}
+			f.write(block, i*piece_length, block.length);
+		}
 		peerConnection.closeConnection();
 	}
 	
