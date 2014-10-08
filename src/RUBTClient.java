@@ -29,12 +29,14 @@ public class RUBTClient {
 		
 		Tracker obj = new Tracker(torrent);
 		ArrayList<Peer> test = obj.getPeerList();
-		Peer test_peer = new Peer("128.6.171.131", "ayylmao", 61350);
+		Peer test_peer = new Peer("128.6.171.131", "-AZ5400-Py3jGhZ69hR4", 61350);
 		PeerConnection peerConnection = new PeerConnection(test_peer, obj);
 		peerConnection.openConnection();
 		peerConnection.doHandShake();
 		peerConnection.get();
 		peerConnection.sendInterested();
+		peerConnection.get();
+		peerConnection.sendRequest(0, 0);
 		peerConnection.get();
 		peerConnection.closeConnection();
 	}
