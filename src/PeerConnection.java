@@ -120,8 +120,8 @@ public class PeerConnection {
 			int length = in.readInt();
 			byte[] response = new byte[length];
 			in.read(response);
-			ByteBuffer res = ByteBuffer.allocate(length);
-			res.put(response);
+			System.out.println(Arrays.toString(response));
+			ByteBuffer res = ByteBuffer.wrap(response);
 			int messageId = res.get();
 		} catch (IOException e) {
 			System.err.println("IO error: " + e.getMessage());
@@ -164,8 +164,10 @@ public class PeerConnection {
 		try {
 			ByteBuffer i = ByteBuffer.allocate(5);
 			i.putInt(1);
-			i.put((byte)2);
-			out.write(i.array());
+			ByteArrayOutputStream bo = new ByteArrayOutputStream();
+			bo.write(i.array());
+			bo.write(2);
+			out.write(bo.toByteArray());
 		} catch (IOException e) {
 			System.err.println("IO error: " + e.getMessage());
 		}

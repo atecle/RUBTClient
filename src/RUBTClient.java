@@ -32,7 +32,10 @@ public class RUBTClient {
 		Peer test_peer = new Peer("128.6.171.131", "ayylmao", 61350);
 		PeerConnection peerConnection = new PeerConnection(test_peer, obj);
 		peerConnection.openConnection();
-		System.out.println(peerConnection.doHandShake());
+		peerConnection.doHandShake();
+		peerConnection.get();
+		peerConnection.sendInterested();
+		peerConnection.get();
 		peerConnection.closeConnection();
 	}
 	
