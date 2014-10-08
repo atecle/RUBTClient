@@ -1,6 +1,8 @@
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.io.*;
 import java.net.*;
+import java.util.Arrays;
 
 public class PeerConnection {
 	private String ip;
@@ -9,12 +11,12 @@ public class PeerConnection {
 	private Tracker tracker;
 
 	private Socket peerSocket;
-	private PrintWriter out;
+	private DataOutputStream out;
 	private DataInputStream in;
 
 	private static int HEADER_SIZE = 68;
 
-	private static String PROTOCOL = "BitTorrent Protocol";
+	private static String PROTOCOL = "BitTorrent protocol";
 
 	public PeerConnection(Peer peer, Tracker tracker) {
 		this.ip = peer.getIP();
@@ -23,35 +25,44 @@ public class PeerConnection {
 		this.tracker = tracker;
 	}
 
-	public static ByteBuffer makeHeader(Tracker tracker) {
-		ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE);
-		header.put((byte)19);
-		header.put(PROTOCOL.getBytes());
-		for (int i = 0; i < 8; i++)
-			header.put((byte)0);
-		header.put(tracker.getTorrentInfo().info_hash.array());
-		header.put(tracker.getPeerId().getBytes());
-		System.out.println("SHA: " + tracker.getTorrentInfo().info_hash.array());
-		System.out.println("My Peer ID: " + tracker.getPeerId());
-		return header;
+	public static byte[] makeHeader(Tracker tracker) throws UnsupportedEncodingException {
+		ByteArrayOutputStream outBytes = null;
+		try {
+			outBytes = new ByteArrayOutputStream();
+			outBytes.write(PROTOCOL.length());
+			outBytes.write(PROTOCOL.getBytes("UTF-8"));
+
+			for (int i = 0; i < 8; i++)
+				outBytes.write(0);
+
+			outBytes.write(tracker.getTorrentInfo().info_hash.array());
+			outBytes.write(tracker.getPeerId().getBytes());
+
+			System.out.println("SHA: " + tracker.getTorrentInfo().info_hash.array());
+			System.out.println("My Peer ID: " + tracker.getPeerId());
+		} catch (Exception e) {e.printStackTrace();}
+
+		return outBytes.toByteArray();
 	}
 
 	public void openConnection() {
 		try {
 			peerSocket = new Socket(ip, port);
-			out = new PrintWriter(peerSocket.getOutputStream(), true);
+			out = new DataOutputStream(peerSocket.getOutputStream());
 			in = new DataInputStream(peerSocket.getInputStream());
 		} catch (UnknownHostException e) {
 			System.err.println("Not a valid host!");
 		} catch (IOException e) {
 			System.err.println("IO error: " + e.getMessage());
 		}
+
 	}
 
 	public boolean doHandShake() {
 		try {
 			System.out.println("Starting handshake...");
-			out.print(makeHeader(tracker).array());
+			out.write(makeHeader(tracker));
+			
 			System.out.println("Sent handshake");
 
 			System.out.println("Getting response...");
@@ -59,7 +70,7 @@ public class PeerConnection {
 			in.read(response);
 			ByteBuffer hs = ByteBuffer.wrap(response);
 			System.out.println("Recieved response " + response);
-
+			System.out.println(Arrays.toString(response));
 			int length = hs.get();
 			System.out.println("Length: " + length);
 

@@ -132,7 +132,7 @@ public class Tracker {
 			in.close();
 
 
-			map = (HashMap<Object, Object>) Bencoder2.decode(response_bytes);
+			map = (HashMap) Bencoder2.decode(response_bytes);
 			
 
 		} catch (IOException e) {
