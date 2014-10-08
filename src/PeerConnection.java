@@ -131,13 +131,13 @@ public class PeerConnection {
 		byte[] block = null;
 		try {
 			int length = in.readInt();
-			byte[] response = new byte[length];
+			byte[] response = new byte[16393];
 			in.read(response);
 			ByteBuffer res = ByteBuffer.wrap(response);
 			int messageId = res.get();
 			int index = res.getInt();
 			int begin = res.getInt();
-			block = new byte[length - 9];
+			block = new byte[16393 - 9];
 			res.get(block);
 		} catch (IOException e) {
 			System.err.println("IO error: " + e.getMessage());

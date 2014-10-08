@@ -53,24 +53,24 @@ public class RUBTClient {
 			System.out.println("Getting piece " + i + ", block 1");
 			peerConnection.sendRequest(i, 0);
 			byte[] block = peerConnection.getPiece();
-			for (int j = 0; j < block.length; j++) {
+			/*for (int j = 0; j < block.length; j++) {
 				if (block[j] != pieceSHA[j]) {
-					System.out.println("ERROR");
+					System.out.println("ERRdOR");
 					return;
 				}
-			}
-			f.write(block, i*piece_length, block.length);
+			}*/
+			//f.write(block, i*piece_length, block.length);
 
 			System.out.println("Getting piece " + i + ", block 2");
 			peerConnection.sendRequest(i, 16384);
 			block = peerConnection.getPiece();
-			for (int j = 0; j < block.length; j++) {
+			/*for (int j = 0; j < block.length; j++) {
 				if (block[j] != pieceSHA[block.length+j]) {
-					System.out.println("ERROR");
+					System.out.println("ERRsOR");
 					return;
 				}
-			}
-			f.write(block, i*piece_length, block.length);
+			}*/
+			//f.write(block, i*piece_length, block.length);
 		}
 		peerConnection.closeConnection();
 	}
