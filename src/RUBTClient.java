@@ -3,6 +3,8 @@ import java.nio.*;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 
 
@@ -46,32 +48,51 @@ public class RUBTClient {
 		peerConnection.get();
 		peerConnection.sendInterested();
 		peerConnection.get();
-		FileOutputStream f = new FileOutputStream(output_file);
+		FileOutputStream f = new FileOutputStream(output_file, true);
 		for (int i = 0; i < num_pieces; i++) {
 			byte[] pieceSHA = piece_hashes[i].array();
 
 			System.out.println("Getting piece " + i + ", block 1");
 			peerConnection.sendRequest(i, 0);
 			byte[] block = peerConnection.getPiece();
-			/*for (int j = 0; j < block.length; j++) {
-				if (block[j] != pieceSHA[j]) {
-					System.out.println("ERRdOR");
-					return;
-				}
-			}*/
-			//f.write(block, i*piece_length, block.length);
+			try {
+				MessageDigest digest = MessageDigest.getInstance("SHA-1");
+				digest.update(block);
+				byte[] info_hash = digest.digest();
+				//for (int j = 0; j < block.length; j++) {
+				//	if (info_hash[j] != pieceSHA[j]) {
+				//		System.out.println("ERRdOR");
+				//		return;
+				//	}
+				//}
+			}
+			catch(NoSuchAlgorithmException e) {
+				System.out.println("Error: " + e.getMessage());
+				return;
+			}
+			f.write(block);
 
 			System.out.println("Getting piece " + i + ", block 2");
 			peerConnection.sendRequest(i, 16384);
 			block = peerConnection.getPiece();
-			/*for (int j = 0; j < block.length; j++) {
-				if (block[j] != pieceSHA[block.length+j]) {
-					System.out.println("ERRsOR");
-					return;
-				}
-			}*/
-			//f.write(block, i*piece_length, block.length);
+			try {
+				MessageDigest digest = MessageDigest.getInstance("SHA-1");
+				digest.update(block);
+				byte[] info_hash = digest.digest();
+				//for (int j = 0; j < block.length; j++) {
+				//	if (info_hash[j] != pieceSHA[j]) {
+				//		System.out.println("ERRdOR");
+				//		return;
+				//	}
+				//}
+			}
+			catch(NoSuchAlgorithmException e) {
+				System.out.println("Error: " + e.getMessage());
+				return;
+			}
+			f.write(block);
 		}
+		f.close();
 		peerConnection.closeConnection();
 	}
 	
