@@ -36,10 +36,12 @@ public class RUBTClient {
 		int piece_length = obj.getTorrentInfo().piece_length;
 		ByteBuffer[] piece_hashes = obj.getTorrentInfo().piece_hashes;
 		int num_pieces = piece_hashes.length;
+		int last_piece_size = file_length - piece_length * (num_pieces - 1);
 		System.out.println("File size: " + file_length);
 		System.out.println("Piece size: " + piece_length);
 		System.out.println("Number of pieces: " + num_pieces);
 		System.out.println("Number of blocks: " + piece_length/16384);
+		System.out.println("Last piece size: " + last_piece_size);
 		ArrayList<Peer> test = obj.getPeerList();
 		Peer test_peer = new Peer("128.6.171.131", "-AZ5400-Py3jGhZ69hR4", 61350);
 		PeerConnection peerConnection = new PeerConnection(test_peer, obj);
@@ -54,37 +56,31 @@ public class RUBTClient {
 
 			System.out.println("Getting piece " + i + ", block 1");
 			peerConnection.sendRequest(i, 0);
-			byte[] block = peerConnection.getPiece();
-			try {
-				MessageDigest digest = MessageDigest.getInstance("SHA-1");
-				digest.update(block);
-				byte[] info_hash = digest.digest();
-				//for (int j = 0; j < block.length; j++) {
-				//	if (info_hash[j] != pieceSHA[j]) {
-				//		System.out.println("ERRdOR");
-				//		return;
-				//	}
-				//}
-			}
-			catch(NoSuchAlgorithmException e) {
-				System.out.println("Error: " + e.getMessage());
-				return;
-			}
-			f.write(block);
+			byte[] block1 = peerConnection.getPiece();
 
 			System.out.println("Getting piece " + i + ", block 2");
-			peerConnection.sendRequest(i, 16384);
-			block = peerConnection.getPiece();
+			int block2size = 16384;
+			if (i == num_pieces - 1)
+				block2size = last_piece_size - block2size;
+			peerConnection.sendRequest(i, block2size);
+			byte[] block2 = peerConnection.getPiece();
+
+			ByteArrayOutputStream bo = new ByteArrayOutputStream();
+			bo.write(block1);
+			bo.write(block2);
+
+			byte[] block = bo.toByteArray();
+
 			try {
 				MessageDigest digest = MessageDigest.getInstance("SHA-1");
 				digest.update(block);
 				byte[] info_hash = digest.digest();
-				//for (int j = 0; j < block.length; j++) {
-				//	if (info_hash[j] != pieceSHA[j]) {
-				//		System.out.println("ERRdOR");
-				//		return;
-				//	}
-				//}
+				for (int j = 0; j < block.length; j++) {
+					if (info_hash[j] != pieceSHA[j]) {
+						System.out.println("ERROR at index " + j);
+						return;
+					}
+				}
 			}
 			catch(NoSuchAlgorithmException e) {
 				System.out.println("Error: " + e.getMessage());
