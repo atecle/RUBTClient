@@ -8,6 +8,7 @@ import java.net.*;
 import java.util.Arrays;
 
 public class PeerConnection {
+	
 	private String ip;
 	private int port;
 	private String peerId;
@@ -29,6 +30,7 @@ public class PeerConnection {
 	}
 
 	public static byte[] makeHeader(Tracker tracker) throws UnsupportedEncodingException {
+		
 		ByteArrayOutputStream outBytes = null;
 		try {
 			outBytes = new ByteArrayOutputStream();

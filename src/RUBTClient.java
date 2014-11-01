@@ -6,12 +6,13 @@ import java.nio.*;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 
 
-public class RUBTClient {
+public class RUBTClient implements Runnable {
 
 	public static void main(String[] args) throws Exception {
 		
@@ -34,36 +35,20 @@ public class RUBTClient {
 			e.printStackTrace();
 		}
 		
-		Tracker obj = new Tracker(torrent);
-		int file_length = obj.getTorrentInfo().file_length;
-		int piece_length = obj.getTorrentInfo().piece_length;
-		ByteBuffer[] piece_hashes = obj.getTorrentInfo().piece_hashes;
+		Tracker tracker = new Tracker(torrent);
+		ByteBuffer[] piece_hashes = tracker.getTorrentInfo().piece_hashes;
 		int num_pieces = piece_hashes.length;
-		System.out.println("File size: " + file_length);
-		System.out.println("Piece size: " + piece_length);
-		System.out.println("Number of pieces: " + num_pieces);
-		System.out.println("Number of blocks: " + piece_length/16384);
-		ArrayList<Peer> test = obj.getPeerList();
-		Peer peer = null;
-		for (int i = 0; i < test.size(); i++) {
-			Peer temp = test.get(i);
-			if (temp.getPeerID().substring(0, 7).equals("-AZ5400")) {
-				peer = temp;
-			}
-		}
 		
-		/*if (peer == null) {
-			System.out.println("Could not find 352 seeder");
-			System.exit(1);
-		}*/
 		
-		Peer test_peer = new Peer("128.6.171.131", "-AZ5400-Py3jGhZ69hR4", 61350);
-		PeerConnection peerConnection = new PeerConnection(test_peer, obj);
+		TrackerResponse response = new TrackerResponse(tracker.sendEvent("started"));
+	
+		/*PeerConnection peerConnection = new PeerConnection(response.getValidPeers().get(0), tracker);
 		peerConnection.openConnection();
 		peerConnection.doHandShake();
 		peerConnection.get();
 		peerConnection.sendInterested();
 		peerConnection.get();
+		
 		FileOutputStream f = new FileOutputStream(output_file, true);
 		for (int i = 0; i < num_pieces; i++) {
 			byte[] pieceSHA = piece_hashes[i].array();
@@ -109,7 +94,14 @@ public class RUBTClient {
 			f.write(block);
 		}
 		f.close();
-		peerConnection.closeConnection();
+		peerConnection.closeConnection();*/
+		
+		
+	}
+	
+	
+	public void run() {
+		
 	}
 	
 	/**

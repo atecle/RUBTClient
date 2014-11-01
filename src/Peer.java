@@ -1,10 +1,13 @@
-
+//Adam Tecle & Matt Robinson
 public class Peer {
 
 	private String ip;
 	private String peer_id;
 	private int port;
 	
+	private static int HEADER_SIZE = 68;
+
+	private static String PROTOCOL = "BitTorrent protocol";
 	
 
 	public Peer(String ip, String peer_id, int port) {
