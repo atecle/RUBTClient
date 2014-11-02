@@ -64,8 +64,8 @@ public class RUBTClient implements Runnable {
 	
 		Peer peer = response.getValidPeers().get(0);
 		peer.setClient(client);
-		System.out.println("Connected" + peer.connectToPeer());
-		
+		System.out.println("Connected " + peer.connectToPeer());
+
 		peer.doHandshake();
 		if (!peer.checkHandshake(tracker.getTorrentInfo().info_hash.array())) {
 			System.out.println("handshake failed");
@@ -73,12 +73,8 @@ public class RUBTClient implements Runnable {
 		}
 		
 
-		peer.sendInterested();		
-		peer.listenForUnchoke();				//throwing an error but shouldn't.
-		
-		
-		
-
+		peer.startThreads();
+		peer.addJob(Message.INTERESTED);		
 	}
 
 

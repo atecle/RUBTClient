@@ -4,6 +4,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -42,11 +43,17 @@ public class Message {
 	public static final byte[] interested = {0,0,0,1,2};
 	public static final byte[] uninterested = {0,0,0,1,3};
 
+	private boolean isNull;
+
 
 
 	protected Message(final byte id, int length) {
 		this.id = id;
 		this.length = length;
+	}
+
+	protected Message() {
+		this.isNull = true;
 	}
 
 	public byte getID() {
@@ -55,6 +62,10 @@ public class Message {
 
 	public int getLength() {
 		return length;
+	}
+
+	public boolean isNull() {
+		return isNull;
 	}
 
 	/**
@@ -70,6 +81,14 @@ public class Message {
 		System.arraycopy(handshake_header,0,handshake,0,28);
 		System.arraycopy(info_hash, 0, handshake,28 , 20);
 		System.arraycopy(peer_id, 0, handshake,48 , 20);
+
+		try {
+			System.out.println("Peer Id: " + new String(peer_id, "UTF-8"));
+			System.out.println("Info hash: " + new String(info_hash, "UTF-8"));
+			System.out.println("Handshake: " + new String(handshake, "UTF-8"));
+		} catch (UnsupportedEncodingException e) {
+			System.out.println("Unsupported encoding");
+		}
 
 
 		return handshake;
@@ -128,6 +147,8 @@ public class Message {
 			throws IOException {
 
 		DataOutputStream toPeer = new DataOutputStream(out);
+
+		System.out.println("Sending message " + message.getID());
 
 		if (message.getID() == KEEP_ALIVE_ID) {
 			toPeer.write(message.length);

@@ -8,7 +8,8 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Peer {
 
@@ -28,12 +29,102 @@ public class Peer {
 
 	private byte[] response;
 
-
 	private Socket peerSocket;
 	private DataInputStream fromPeer;
 	private DataOutputStream	toPeer;
 
+	private Thread producer;
+	private Thread consumer;
 
+	private Queue<Message> jobQueue;
+
+	private boolean stopProducing;
+
+	private class Producer implements Runnable {
+		public void run() {
+			while (true) {
+				Message message;
+				try {
+					message = Message.decode(fromPeer);
+				} catch (EOFException e) {
+					continue;
+				} catch (IOException e) {
+					System.out.println("Caught IO Exception trying to decode message: " + e.getMessage());
+					break;
+				}
+				switch (message.getID()) {
+					case Message.CHOKE_ID:
+						System.out.println("Got choke message");
+						choked = true;
+						notifyAll();
+						break;
+					case Message.UNCHOKE_ID:
+						System.out.println("Got unchoke message");
+						choked = false;
+						break;
+					case Message.INTERESTED_ID:
+						System.out.println("Got interested message");
+						interested = true;
+						break;
+					case Message.UNINTERESTED_ID:
+						System.out.println("Got uninterested message");
+						interested = false;
+						break;
+					case Message.HAVE_ID:
+						System.out.println("Got have message");
+						break;
+					case Message.BITFIELD_ID:
+						System.out.println("Got bitfield message");
+						break;
+					case Message.REQUEST_ID:
+						System.out.println("Got request message");
+						//create piece message with data and add it to the queue
+						break;
+					case Message.PIECE_ID:
+						System.out.println("Got piece message");
+						//write data to disk
+						break;
+				}
+			}
+		}
+	}
+
+	private class Consumer implements Runnable {
+		public void run() {
+			while (true) {
+				Message message = jobQueue.poll();
+				if (message != null) { //Queue is not empty
+					if (message.isNull()) {	//Signal to close thread
+						stopProducing = true;
+						break;
+					}
+					while (message.getID() != Message.INTERESTED_ID && choked)
+						try { wait(); } catch (InterruptedException e) {
+							System.out.println("INTERRUPTED");
+							break;
+						}
+					try {
+						Message.encode(toPeer, message);
+					} catch (IOException e) {
+						System.out.println("Caught IO Exception trying to encode message");
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	public void startThreads() {
+		this.producer = new Thread(this.new Producer());
+		this.consumer = new Thread(this.new Consumer());
+		this.jobQueue = new ConcurrentLinkedQueue<Message>();
+		this.producer.start();
+		this.consumer.start();
+	}
+
+	public boolean addJob(Message message) {
+		return jobQueue.offer(message);
+	}
 
 	public Peer(String ip, String peer_id, int port) {
 
@@ -44,7 +135,7 @@ public class Peer {
 		this.peer_choking = true;
 		this.connected = false;
 		this.interested = false;
-
+		this.stopProducing = false;
 
 	}
 
@@ -186,6 +277,11 @@ public class Peer {
 
 
 			fromPeer.read(response);
+			try {
+				System.out.println("Response: " + new String(response, "UTF-8"));
+			} catch (UnsupportedEncodingException e) {
+				System.out.println("Unsupported Encoding");
+			}
 
 
 			System.arraycopy(response, 28, response_hash, 0, 20);
