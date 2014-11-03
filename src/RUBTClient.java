@@ -24,12 +24,26 @@ public class RUBTClient implements Runnable {
 	public int uploaded;
 	
 	public ArrayList<Peer> peer_list;
-	
-	
+
+	public Completed[] completed;
+
+	public String outputFile;
+
+	public class Completed {
+		public boolean first;
+		public boolean second;
+		public Completed() {
+			this.first = false;
+			this.second = false;
+		}
+    }
+
 	private Timer trackerTimer = new Timer("trackerTimer", true);
 	
-	public RUBTClient(Tracker tracker) {
+	public RUBTClient(Tracker tracker, String outputFile) {
 		this.tracker = tracker;
+		this.completed = new Completed[tracker.getTorrentInfo().piece_hashes.length];
+		this.outputFile = outputFile;
 	}
 	
 	public static void main(String[] args) throws Exception {
@@ -60,7 +74,7 @@ public class RUBTClient implements Runnable {
 		
 		TrackerResponse response = new TrackerResponse(tracker.sendEvent("started"));
 
-		RUBTClient client = new RUBTClient(tracker);
+		RUBTClient client = new RUBTClient(tracker, output_file);
 	
 		Peer peer = response.getValidPeers().get(0);
 		peer.setClient(client);

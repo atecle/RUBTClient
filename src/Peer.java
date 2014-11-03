@@ -1,6 +1,7 @@
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.FileOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -40,7 +41,11 @@ public class Peer {
 
 	private boolean stopProducing;
 
+	private boolean[] peerCompleted;
+
 	private class Producer implements Runnable {
+		private FileOutputStream f = new FileOutputStream(client.outputFile);
+		private FileInputStream fo = new FileInputStream(client.outputFile);
 		public void run() {
 			while (true) {
 				Message message;
@@ -50,6 +55,7 @@ public class Peer {
 					continue;
 				} catch (IOException e) {
 					System.out.println("Caught IO Exception trying to decode message: " + e.getMessage());
+					f.close();
 					break;
 				}
 				switch (message.getID()) {
@@ -72,17 +78,32 @@ public class Peer {
 						break;
 					case Message.HAVE_ID:
 						System.out.println("Got have message");
+						HaveMessage hMessage = (HaveMessage)message;
+						peerCompleted[hMessage.getPieceIndex()] = true;
 						break;
 					case Message.BITFIELD_ID:
 						System.out.println("Got bitfield message");
 						break;
 					case Message.REQUEST_ID:
 						System.out.println("Got request message");
-						//create piece message with data and add it to the queue
+						RequestMessage rMessage = (RequestMessage)message;
+						int fileOffset = rMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
+						byte[] data = new byte[rMessage.getLength()];
+						fo.read(data, fileOffset, data.length);
+						Message piece = new PieceMessage(rMessage.getPieceIndex(), rMessage.getOffset(), data);
+						jobQueue.offer(piece);
 						break;
 					case Message.PIECE_ID:
 						System.out.println("Got piece message");
-						//write data to disk
+						PieceMessage pMessage = (PieceMessage)message;
+						if (pMessage.getOffset() == 0) {
+							client.completed[pMessage.getPieceIndex()].first = true;
+						} else {
+							client.completed[pMessage.getPieceIndex()].second = true;
+						}
+						f.write(pMessage.getData(),
+								pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
+								pMessage.getData().length);
 						break;
 				}
 			}
@@ -136,11 +157,11 @@ public class Peer {
 		this.connected = false;
 		this.interested = false;
 		this.stopProducing = false;
-
 	}
 
 	public void setClient(RUBTClient client) {
 		this.client = client;
+		this.peerCompleted = new boolean[client.completed.length];
 	}
 
 

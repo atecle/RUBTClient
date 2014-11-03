@@ -22,11 +22,25 @@ public class PeerConnection {
 
 	private static String PROTOCOL = "BitTorrent protocol";
 
+	private boolean choked;
+	private boolean interested;
+
+	public enum MessageType {
+		CHOKE, UNCHOKE, INTERESTED, NOT_INTERESTED,
+		HAVE, BITFIELD, REQUEST, PIECE, CANCEL
+	}
+
 	public PeerConnection(Peer peer, Tracker tracker) {
 		this.ip = peer.getIP();
 		this.port = peer.getPort();
 		this.peerId = peer.getPeerID();
 		this.tracker = tracker;
+		this.choked = false;
+		this.interested = false;
+	}
+
+	public class Producer implements Runnable {
+		private Thread t;
 	}
 
 	public static byte[] makeHeader(Tracker tracker) throws UnsupportedEncodingException {
@@ -104,7 +118,7 @@ public class PeerConnection {
 
 			if (sha.length != tracker.getTorrentInfo().info_hash.array().length)
 				sameSha = false;
-
+ 
 			for (int i = 0; i < sha.length; i++) {
 				if (sha[i] != tracker.getTorrentInfo().info_hash.array()[i])
 					sameSha = false;
@@ -120,13 +134,31 @@ public class PeerConnection {
 		}
 	}
 
-	public void get() {
+	public void getMessage(int length, ByteBuffer res) {
 		try {
 			int length = in.readInt();
 			byte[] response = new byte[length];
 			in.read(response);
 			ByteBuffer res = ByteBuffer.wrap(response);
 			int messageId = res.get();
+			switch (messageId) {
+				case CHOKE:
+					this.choked = true;
+				case UNCHOKE:
+					this.choked = false;;
+				case INTERESTED:
+					this.interested = true;
+				case NOT_INTERESTED:
+					this.interested = false;
+				case HAVE:
+					break;
+				case BITFIELD:
+					break;
+				case REQUEST:
+					break;
+				case PIECE:
+					break;
+			}
 		} catch (IOException e) {
 			System.err.println("IO error: " + e.getMessage());
 		}
@@ -150,104 +182,62 @@ public class PeerConnection {
 		return block;
 	}
 
-	public void sendKeepAlive() {
-		try {
-			ByteBuffer ka = ByteBuffer.allocate(4);
-			ka.putInt(0);
-			out.write(ka.array());
-		} catch (IOException e) {
-			System.err.println("IO error: " + e.getMessage());
-		}
+	public static ByteBuffer sendKeepAlive() {
+		return ByteBuffer.allocate(4)
+			.putInt(0);
 	}
 
-	public void sendChoke() {
-		try {
-			ByteBuffer c = ByteBuffer.allocate(5);
-			c.putInt(1);
-			c.put((byte)0);
-			out.write(c.array());
-		} catch (IOException e) {
-			System.err.println("IO error: " + e.getMessage());
-		}
+	public static ByteBuffer sendChoke() {
+		return ByteBuffer.allocate(5)
+			.putInt(1);
+			.put((byte)0);
 	}
 
-	public void sendUnChoke() {
-		try {
-			ByteBuffer uc = ByteBuffer.allocate(5);
-			uc.putInt(1);
-			uc.put((byte)1);
-			out.write(uc.array());
-		} catch (IOException e) {
-			System.err.println("IO error: " + e.getMessage());
-		}
+	public static ByteBuffer sendUnChoke() {
+		return ByteBuffer.allocate(5)
+			.putInt(1);
+			.put((byte)1);
 	}
 
-	public void sendInterested() {
-		try {
-			ByteBuffer i = ByteBuffer.allocate(4);
-			i.putInt(1);
-			ByteArrayOutputStream bo = new ByteArrayOutputStream();
-			bo.write(i.array());
-			bo.write(2);
-			out.write(bo.toByteArray());
-		} catch (IOException e) {
-			System.err.println("IO error: " + e.getMessage());
-		}
+	public static ByteBuffer sendInterested() {
+		return ByteBuffer.allocate(4)
+			.putInt(1)
+			.put((byte)2);
 	}
 
-	public void sendUnInterested() {
-		try {
-			ByteBuffer ui = ByteBuffer.allocate(5);
-			ui.putInt(1);
-			ui.put((byte)3);
-			out.write(ui.array());
-		} catch (IOException e) {
-			System.err.println("IO error: " + e.getMessage());
-		}
+	public static void sendUnInterested() {
+		return ByteBuffer.allocate(5)
+			.putInt(1)
+			.put((byte)3);
 	}
 
-	public void sendHave(int index) {
-		try {
-			ByteBuffer h = ByteBuffer.allocate(9);
-			h.putInt(5);
-			h.put((byte)4);
-			h.putInt(index);
-			out.write(h.array());
-		} catch (IOException e) {
-			System.err.println("IO error: " + e.getMessage());
-		}
+	public static void sendHave(int index) {
+		return ByteBuffer.allocate(9)
+			.putInt(5);
+			.put((byte)4);
+			.putInt(index);
 	}
 
-	public void sendRequest(int index, int begin) {
+	public static void sendRequest(int index, int begin) {
 		sendRequest(index, begin, 16384);
 	}
 
-	public void sendRequest(int index, int begin, int length) {
-		try {
-			ByteBuffer r = ByteBuffer.allocate(17);
-			r.putInt(13);
-			r.put((byte)6);
-			r.putInt(index);
-			r.putInt(begin);
-			r.putInt(length);
-			out.write(r.array());
-		} catch (IOException e) {
-			System.err.println("IO error: " + e.getMessage());
-		}
+	public static void sendRequest(int index, int begin, int length) {
+		return ByteBuffer.allocate(17)
+			.putInt(13)
+			.put((byte)6)
+			.putInt(index)
+			.putInt(begin)
+			.putInt(length);
 	}
 
-	public void sendPiece(int index, int begin, byte[] block) {
-		try {
-			ByteBuffer p = ByteBuffer.allocate(13 + block.length);
-			p.putInt(9 + block.length);
-			p.put((byte)7);
-			p.putInt(index);
-			p.putInt(begin);
-			p.put(block);
-			out.write(p.array());
-		} catch (IOException e) {
-			System.err.println("IO error: " + e.getMessage());
-		}
+	public static void sendPiece(int index, int begin, byte[] block) {
+		return ByteBuffer.allocate(13 + block.length);
+			.putInt(9 + block.length)
+			.put((byte)7)
+			.putInt(index)
+			.putInt(begin)
+			.put(block);
 	}
 
 	public void closeConnection() {
