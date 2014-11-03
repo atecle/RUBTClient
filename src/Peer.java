@@ -2,6 +2,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -44,9 +45,15 @@ public class Peer {
 	private boolean[] peerCompleted;
 
 	private class Producer implements Runnable {
-		private FileOutputStream f = new FileOutputStream(client.outputFile);
-		private FileInputStream fo = new FileInputStream(client.outputFile);
+		private FileOutputStream f;
+		private FileInputStream fo;
 		public void run() {
+			try {
+				f = new FileOutputStream(client.outputFile);
+				fo = new FileInputStream(client.outputFile);
+			} catch (IOException e) {
+				System.out.println(e.getMessage());
+			}
 			while (true) {
 				Message message;
 				try {
@@ -55,7 +62,6 @@ public class Peer {
 					continue;
 				} catch (IOException e) {
 					System.out.println("Caught IO Exception trying to decode message: " + e.getMessage());
-					f.close();
 					break;
 				}
 				switch (message.getID()) {
@@ -78,34 +84,47 @@ public class Peer {
 						break;
 					case Message.HAVE_ID:
 						System.out.println("Got have message");
-						HaveMessage hMessage = (HaveMessage)message;
+						Message.HaveMessage hMessage = (Message.HaveMessage)message;
 						peerCompleted[hMessage.getPieceIndex()] = true;
 						break;
 					case Message.BITFIELD_ID:
 						System.out.println("Got bitfield message");
 						break;
 					case Message.REQUEST_ID:
-						System.out.println("Got request message");
-						RequestMessage rMessage = (RequestMessage)message;
-						int fileOffset = rMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
-						byte[] data = new byte[rMessage.getLength()];
-						fo.read(data, fileOffset, data.length);
-						Message piece = new PieceMessage(rMessage.getPieceIndex(), rMessage.getOffset(), data);
-						jobQueue.offer(piece);
+						try {
+							System.out.println("Got request message");
+							Message.RequestMessage rMessage = (Message.RequestMessage)message;
+							int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
+							byte[] data = new byte[rMessage.getLength()];
+							fo.read(data, fileOffset, data.length);
+							Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
+							jobQueue.offer(piece);
+						} catch (IOException e) {
+							System.out.println(e.getMessage());
+						}
 						break;
 					case Message.PIECE_ID:
-						System.out.println("Got piece message");
-						PieceMessage pMessage = (PieceMessage)message;
-						if (pMessage.getOffset() == 0) {
-							client.completed[pMessage.getPieceIndex()].first = true;
-						} else {
-							client.completed[pMessage.getPieceIndex()].second = true;
+						try {
+							System.out.println("Got piece message");
+							Message.PieceMessage pMessage = (Message.PieceMessage)message;
+							if (pMessage.getOffset() == 0) {
+								client.completed[pMessage.getPieceIndex()].first = true;
+							} else {
+								client.completed[pMessage.getPieceIndex()].second = true;
+							}
+							f.write(pMessage.getPiece(),
+									pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
+									pMessage.getPiece().length);
+						} catch (IOException e) {
+							System.out.println(e.getMessage());
 						}
-						f.write(pMessage.getData(),
-								pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
-								pMessage.getData().length);
 						break;
 				}
+			}
+			try {
+				f.close();
+			} catch (IOException e) {
+				System.out.println(e.getMessage());
 			}
 		}
 	}
