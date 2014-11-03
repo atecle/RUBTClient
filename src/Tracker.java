@@ -1,19 +1,16 @@
 
-import java.net.*;
-import java.nio.ByteBuffer;
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
+/**
+ * @author Adam Tecle
+ * @author Matthew Robinson
+ * 
+ */
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.AbstractList;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-//Adam Tecle & Matt Robinson
+
 
 
 
@@ -23,67 +20,21 @@ public class Tracker {
 	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
 
 	private String info_hash;
+	private String URL;
 	private String peer_id;
-	private ArrayList<Peer> peer_list;
 	private int port;
 	private int uploaded;
 	private int downloaded;
-	private int left;
 	private TorrentInfo torrent;
 
-
-	public final static ByteBuffer INTERVAL_KEY = ByteBuffer.wrap(new byte[]{ 'i', 'n', 't', 'e','r','v','a','l' });
-
-	/**
-	 * Key used to retrieve the incomplete value from the tracker response.
-	 */
-
-	public final static ByteBuffer INCOMPLETE_KEY = ByteBuffer.wrap(new byte[]{ 'i', 'n', 'c', 'o','m','p','l','e','t','e' });
-
-	/**
-	 * Key used to retrieve the complete value from the tracker response.
-	 */
-	public final static ByteBuffer COMPLETE_KEY = ByteBuffer.wrap(new byte[]{ 'c', 'o', 'm', 'p','l','e','t','e' });
-
-	/**
-	 * Key used to retrieve the peer list from the tracker response.
-	 */
-	public final static ByteBuffer PEERS_KEY = ByteBuffer.wrap(new byte[]{ 'p', 'e', 'e', 'r','s'});
-
-	/**
-	 * Key used to retrieve the peer list from the tracker response.
-	 */
-	public final static ByteBuffer DOWNLOADED_KEY = ByteBuffer.wrap(new byte[]{ 'd', 'o', 'w', 'n','l','o','a','d','e','d'});
-
-	/**
-	 * Key used to retrieve the peer list from the tracker response.
-	 */
-	public final static ByteBuffer MIN_INTERVAL_KEY = ByteBuffer.wrap(new byte[]{ 'm', 'i', 'n', ' ','i','n','t','e','r','v','a','l'});
-
-	/**
-	 * Key used to retrieve the peer id from the tracker response.
-	 */
-	public final static ByteBuffer PEER_ID_KEY = ByteBuffer.wrap(new byte[]{ 'p', 'e', 'e', 'r',' ','i','d'});
-
-	/**
-	 * Key used to retrieve the peer port from the tracker response.
-	 */
-	public final static ByteBuffer PEER_PORT_KEY = ByteBuffer.wrap(new byte[]{ 'p', 'o', 'r', 't'});
-
-	/**
-	 * Key used to retrieve the peer ip from the tracker response.
-	 */
-	public final static ByteBuffer PEER_IP_KEY = ByteBuffer.wrap(new byte[]{ 'i', 'p'});
-
-
+	
 	public Tracker(TorrentInfo torr) {
 		this.torrent = torr;
 		this.peer_id = randomAlphaNumeric();
 		this.uploaded = 0;
 		this.downloaded = 0;
-		this.left = 0;
 		this.port = 6881;
-		this.peer_list = getPeers();
+		constructURL("");
 	}
 
 	public int getUploaded() {
@@ -94,70 +45,26 @@ public class Tracker {
 		return downloaded;
 	}
 
+	public void updateProgress(int downloaded, int uploaded) {
+		this.downloaded = downloaded;
+		this.uploaded = uploaded;
+	}
+
 	public int getPort() {
 		return port;
 	}
 
-	public int getLeft() {
-		return left;
-	}
-	
-	public ArrayList<Peer> getPeerList() {
-		return peer_list;
+
+	public void setPort(int port) {
+		this.port = port;
 	}
 
-    public String getInfoHash() {
-        return info_hash;
-    }
-	
-	public HashMap connect() {
-		
-		return null;
+
+
+	public String getInfoHash() {
+		return info_hash;
 	}
 
-	private ArrayList<Peer> getPeers() {
-		
-		InputStream in = null;
-		ArrayList<Peer> peer_list = new ArrayList<Peer>(20);
-		HashMap map = null;
-		HttpURLConnection conn = sendGet();
-
-		byte[] b = null;
-		try {
-
-			in = conn.getInputStream();
-
-			byte[] response_bytes = new byte[in.available()];
-
-			in.read(response_bytes);
-			b = response_bytes;
-			in.close();
-
-
-			map = (HashMap) Bencoder2.decode(response_bytes);
-			
-
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (BencodingException e) {
-			e.printStackTrace();
-		}
-
-	
-		ArrayList list = (ArrayList)map.get(PEERS_KEY);
-		
-		for (int i = 0; i < list.size(); i++) {
-			HashMap t = (HashMap) list.get(i);
-			String peer_id = new String(((ByteBuffer)t.get(PEER_ID_KEY)).array());
-			String peer_ip = new String(((ByteBuffer)t.get(PEER_IP_KEY)).array());
-			int peer_port = (Integer) t.get(PEER_PORT_KEY);
-			Peer peer = new Peer(peer_ip, peer_id, peer_port);
-			peer_list.add(peer);
-		}
-
-
-		return peer_list;
-	}
 
 	public TorrentInfo getTorrentInfo() {
 		return torrent;
@@ -168,14 +75,40 @@ public class Tracker {
 	}
 
 
-	private HttpURLConnection sendGet() {
+	public byte[] sendEvent(String event) {
+
+		HttpURLConnection connection = sendGet(event);
+		
+		DataInputStream in = null;
+		ByteArrayOutputStream bencoded_response = null;
+		try {
+			in  = new DataInputStream(connection.getInputStream());
+			bencoded_response = new ByteArrayOutputStream();
+
+			int r;
+			while ((r = in.read()) != -1) {
+				bencoded_response.write(r);
+			}
+
+			bencoded_response.close();
+
+		} catch (IOException e) {
+			System.err.println("IO Exception " + e.getMessage());
+		}
+
+
+		return bencoded_response.toByteArray();
+	}
+
+
+	public HttpURLConnection sendGet(String event) {
 
 		URL trackerURL = null;
 		HttpURLConnection conn = null;
 
 		try 
 		{
-			trackerURL = constructURL("started");
+			trackerURL = new URL(this.URL);
 			trackerURL.openConnection();
 
 			conn = (HttpURLConnection) trackerURL.openConnection();
@@ -195,6 +128,32 @@ public class Tracker {
 		return conn;
 	}
 
+	/**
+	 * 
+	 * @param Event maps to "started", "completed", "stopped", or can be empty ""
+	 * @throws MalformedURLException
+	 */
+	public void constructURL(String event) {
+
+		if (!event.equals("started") && !event.equals("completed") && !event.equals("stopped")) {
+			event = "";
+		}
+
+		String base_url = torrent.announce_url.toString();
+
+		String escaped_info_hash = byteArrayToURLString(torrent.info_hash.array());
+		String escaped_peer_id = byteArrayToURLString(peer_id.getBytes());
+		String query = "?info_hash=" + escaped_info_hash + 
+				"&peer_id=" + escaped_peer_id +
+				"&downloaded=" + downloaded +
+				"&left=" + (torrent.file_length - downloaded) +
+				"&port=" + port +
+				"&event=" + event +
+				"&uploaded=" + uploaded;
+
+		this.URL = base_url + query;
+	}
+
 	private static String randomAlphaNumeric() {
 
 		StringBuilder builder = new StringBuilder();
@@ -205,32 +164,6 @@ public class Tracker {
 		}
 		return builder.toString();
 
-	}
-
-	/**
-	 * 
-	 * @param Event maps to "started", "completed", "stopped", or can be empty ""
-	 * @return URL to be sent to tracker
-	 * @throws MalformedURLException
-	 */
-	private URL constructURL(String event) throws MalformedURLException {
-
-		if (!event.equals("started") && !event.equals("completed") && !event.equals("stopped")) {
-			event = "";
-		}
-
-		String base_url = torrent.announce_url.toString();
-		String escaped_info_hash = byteArrayToURLString(torrent.info_hash.array());
-		String escaped_peer_id = byteArrayToURLString(peer_id.getBytes());
-		String query = "?info_hash=" + escaped_info_hash + 
-				"&peer_id=" + escaped_peer_id +
-				"&downloaded=" + downloaded +
-				"&left=" + left +
-				"&port=" + port +
-				"&event=" + event +
-				"&uploaded=" + uploaded;
-
-		return new URL(base_url + query);
 	}
 
 	/**
