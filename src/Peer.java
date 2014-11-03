@@ -302,7 +302,7 @@ public class Peer {
 
 	public void doHandshake() {
 
-		sendMessage(Message.handshake(peer_id.getBytes(), client.tracker.getTorrentInfo().info_hash.array()));
+		sendMessage(Message.handshake(client.tracker.getPeerId().getBytes(), client.tracker.getTorrentInfo().info_hash.array()));
 
 	}
 

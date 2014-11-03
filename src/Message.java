@@ -99,12 +99,20 @@ public class Message {
 		DataInputStream fromPeer = new DataInputStream(in);
 
 		int length = fromPeer.readInt();
-
+		
+		System.out.println("Message length: " + length);
 
 		if (length == 0) return KEEP_ALIVE;
 
-		int id = fromPeer.readInt();
+		
+		
+		int id = fromPeer.readByte();
 
+
+		
+		System.out.println("Message " + id);
+		
+		
 
 		switch (id) {
 
