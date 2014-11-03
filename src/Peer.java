@@ -43,8 +43,11 @@ public class Peer {
 
 	private boolean[] peerCompleted;
 
+	private Object lock = new Object();
+
 	private class Producer implements Runnable {
 		private RandomAccessFile f;
+
 		public void run() {
 			try {
 				f = new RandomAccessFile(client.outputFile, "rw");
@@ -54,7 +57,9 @@ public class Peer {
 			while (true) {
 				Message message;
 				try {
+					System.out.println("Attempting decode");
 					message = Message.decode(fromPeer, peerCompleted.length / 8);
+					System.out.println("leaving decode");
 				} catch (EOFException e) {
 					continue;
 				} catch (IOException e) {
@@ -62,14 +67,20 @@ public class Peer {
 					break;
 				}
 				switch (message.getID()) {
+					case Message.KEEP_ALIVE_ID:
+						System.out.println("Got keepalive message");
+						break;
 					case Message.CHOKE_ID:
 						System.out.println("Got choke message");
 						choked = true;
-						notifyAll();
 						break;
 					case Message.UNCHOKE_ID:
 						System.out.println("Got unchoke message");
-						choked = false;
+						synchronized (lock) {
+							choked = false;
+							lock.notifyAll();
+						}
+						System.out.println("Notified...");
 						break;
 					case Message.INTERESTED_ID:
 						System.out.println("Got interested message");
@@ -113,6 +124,7 @@ public class Peer {
 							} else {
 								client.completed[pMessage.getPieceIndex()].second = true;
 							}
+							System.out.println(Arrays.toString(client.completed));
 							f.write(pMessage.getPiece(),
 									pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
 									pMessage.getPiece().length);
@@ -139,12 +151,18 @@ public class Peer {
 						stopProducing = true;
 						break;
 					}
-					while (message.getID() != Message.INTERESTED_ID && choked)
-						try { wait(); } catch (InterruptedException e) {
-							System.out.println("INTERRUPTED");
-							break;
+					synchronized (lock) {
+						while (message.getID() != Message.INTERESTED_ID && choked) {
+							System.out.println("Started waiting");
+							try { lock.wait(); } catch (InterruptedException e) {
+								System.out.println("INTERRUPTED");
+								break;
+							}
+							System.out.println("Woke up");
 						}
+					}
 					try {
+						System.out.println("Writing message: " + message.getID());
 						Message.encode(toPeer, message);
 					} catch (IOException e) {
 						System.out.println("Caught IO Exception trying to encode message");

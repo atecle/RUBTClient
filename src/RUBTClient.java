@@ -88,6 +88,7 @@ public class RUBTClient implements Runnable {
 
 		peer.startThreads();
 		peer.addJob(Message.INTERESTED);		
+		peer.addJob(new Message.RequestMessage(0, 0, 16384));
 	}
 
 
