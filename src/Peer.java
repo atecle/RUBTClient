@@ -1,8 +1,7 @@
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.FileOutputStream;
-import java.io.FileInputStream;
+import java.io.RandomAccessFile;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -45,12 +44,10 @@ public class Peer {
 	private boolean[] peerCompleted;
 
 	private class Producer implements Runnable {
-		private FileOutputStream f;
-		private FileInputStream fo;
+		private RandomAccessFile f;
 		public void run() {
 			try {
-				f = new FileOutputStream(client.outputFile);
-				fo = new FileInputStream(client.outputFile);
+				f = new RandomAccessFile(client.outputFile, "rw");
 			} catch (IOException e) {
 				System.out.println(e.getMessage());
 			}
@@ -77,10 +74,12 @@ public class Peer {
 					case Message.INTERESTED_ID:
 						System.out.println("Got interested message");
 						interested = true;
+						jobQueue.offer(Message.UNCHOKE);
 						break;
 					case Message.UNINTERESTED_ID:
 						System.out.println("Got uninterested message");
 						interested = false;
+						jobQueue.offer(Message.CHOKE);
 						break;
 					case Message.HAVE_ID:
 						System.out.println("Got have message");
@@ -96,7 +95,7 @@ public class Peer {
 							Message.RequestMessage rMessage = (Message.RequestMessage)message;
 							int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
 							byte[] data = new byte[rMessage.getLength()];
-							fo.read(data, fileOffset, data.length);
+							f.read(data, fileOffset, data.length);
 							Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
 							jobQueue.offer(piece);
 						} catch (IOException e) {
