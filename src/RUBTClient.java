@@ -77,6 +77,7 @@ public class RUBTClient implements Runnable {
 		RUBTClient client = new RUBTClient(tracker, output_file);
 	
 		Peer peer = response.getValidPeers().get(0);
+		System.out.println(peer.getIP());
 		peer.setClient(client);
 		System.out.println("Connected " + peer.connectToPeer());
 
@@ -88,7 +89,8 @@ public class RUBTClient implements Runnable {
 		
 
 		peer.startThreads();
-		peer.addJob(Message.INTERESTED);		
+		peer.addJob(Message.INTERESTED);
+		
 	}
 
 

@@ -1,3 +1,4 @@
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -32,8 +33,8 @@ public class Peer {
 	private byte[] response;
 
 	private Socket peerSocket;
-	private DataInputStream fromPeer;
-	private DataOutputStream	toPeer;
+	private  DataInputStream fromPeer = null;
+	private  DataOutputStream	toPeer = null;
 
 	private Thread producer;
 	private Thread consumer;
@@ -55,70 +56,75 @@ public class Peer {
 				System.out.println(e.getMessage());
 			}
 			while (true) {
-				Message message;
+
+				Message message = null;
+
 				try {
+					
 					message = Message.decode(fromPeer);
+
 				} catch (EOFException e) {
 					continue;
 				} catch (IOException e) {
 					System.out.println("Caught IO Exception trying to decode message: " + e.getMessage());
 					break;
 				}
+
 				switch (message.getID()) {
-					case Message.CHOKE_ID:
-						System.out.println("Got choke message");
-						choked = true;
-						notifyAll();
-						break;
-					case Message.UNCHOKE_ID:
-						System.out.println("Got unchoke message");
-						choked = false;
-						break;
-					case Message.INTERESTED_ID:
-						System.out.println("Got interested message");
-						interested = true;
-						break;
-					case Message.UNINTERESTED_ID:
-						System.out.println("Got uninterested message");
-						interested = false;
-						break;
-					case Message.HAVE_ID:
-						System.out.println("Got have message");
-						Message.HaveMessage hMessage = (Message.HaveMessage)message;
-						peerCompleted[hMessage.getPieceIndex()] = true;
-						break;
-					case Message.BITFIELD_ID:
-						System.out.println("Got bitfield message");
-						break;
-					case Message.REQUEST_ID:
-						try {
-							System.out.println("Got request message");
-							Message.RequestMessage rMessage = (Message.RequestMessage)message;
-							int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
-							byte[] data = new byte[rMessage.getLength()];
-							fo.read(data, fileOffset, data.length);
-							Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
-							jobQueue.offer(piece);
-						} catch (IOException e) {
-							System.out.println(e.getMessage());
+				case Message.CHOKE_ID:
+					System.out.println("Got choke message");
+					choked = true;
+					notifyAll();
+					break;
+				case Message.UNCHOKE_ID:
+					System.out.println("Got unchoke message");
+					choked = false;
+					break;
+				case Message.INTERESTED_ID:
+					System.out.println("Got interested message");
+					interested = true;
+					break;
+				case Message.UNINTERESTED_ID:
+					System.out.println("Got uninterested message");
+					interested = false;
+					break;
+				case Message.HAVE_ID:
+					System.out.println("Got have message");
+					Message.HaveMessage hMessage = (Message.HaveMessage)message;
+					peerCompleted[hMessage.getPieceIndex()] = true;
+					break;
+				case Message.BITFIELD_ID:
+					System.out.println("Got bitfield message");
+					break;
+				case Message.REQUEST_ID:
+					try {
+						System.out.println("Got request message");
+						Message.RequestMessage rMessage = (Message.RequestMessage)message;
+						int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
+						byte[] data = new byte[rMessage.getLength()];
+						fo.read(data, fileOffset, data.length);
+						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
+						jobQueue.offer(piece);
+					} catch (IOException e) {
+						System.out.println(e.getMessage());
+					}
+					break;
+				case Message.PIECE_ID:
+					try {
+						System.out.println("Got piece message");
+						Message.PieceMessage pMessage = (Message.PieceMessage)message;
+						if (pMessage.getOffset() == 0) {
+							client.completed[pMessage.getPieceIndex()].first = true;
+						} else {
+							client.completed[pMessage.getPieceIndex()].second = true;
 						}
-						break;
-					case Message.PIECE_ID:
-						try {
-							System.out.println("Got piece message");
-							Message.PieceMessage pMessage = (Message.PieceMessage)message;
-							if (pMessage.getOffset() == 0) {
-								client.completed[pMessage.getPieceIndex()].first = true;
-							} else {
-								client.completed[pMessage.getPieceIndex()].second = true;
-							}
-							f.write(pMessage.getPiece(),
-									pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
-									pMessage.getPiece().length);
-						} catch (IOException e) {
-							System.out.println(e.getMessage());
-						}
-						break;
+						f.write(pMessage.getPiece(),
+								pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
+								pMessage.getPiece().length);
+					} catch (IOException e) {
+						System.out.println(e.getMessage());
+					}
+					break;
 				}
 			}
 			try {
@@ -132,6 +138,7 @@ public class Peer {
 	private class Consumer implements Runnable {
 		public void run() {
 			while (true) {
+
 				Message message = jobQueue.poll();
 				if (message != null) { //Queue is not empty
 					if (message.isNull()) {	//Signal to close thread
@@ -202,7 +209,7 @@ public class Peer {
 
 
 	public boolean listenForUnchoke() {
-		
+
 		try {
 			if (fromPeer.read() == 1 && fromPeer.read() == 1) {
 
@@ -222,7 +229,7 @@ public class Peer {
 			this.peerSocket = new Socket(peer_ip, port);
 			this.peerSocket.setSoTimeout(180*1000);				//3 minute timeout
 			this.toPeer = new DataOutputStream(peerSocket.getOutputStream());
-			this.fromPeer = new DataInputStream(peerSocket.getInputStream());
+			this.fromPeer = new DataInputStream(new BufferedInputStream(peerSocket.getInputStream()));
 		} catch(UnknownHostException e) {
 			System.err.println("Unknown Host " + e.getMessage());
 			return false;
@@ -288,7 +295,7 @@ public class Peer {
 	public Message listen() {
 
 		try {
-			
+
 			Message m = Message.decode(fromPeer);
 
 			return m;
@@ -303,7 +310,7 @@ public class Peer {
 
 	public void doHandshake() {
 
-		sendMessage(Message.handshake(peer_id.getBytes(), client.tracker.getTorrentInfo().info_hash.array()));
+		sendMessage(Message.handshake(client.tracker.getPeerId().getBytes(), client.tracker.getTorrentInfo().info_hash.array()));
 
 	}
 
@@ -315,7 +322,7 @@ public class Peer {
 
 		try {
 
-
+			
 			fromPeer.read(response);
 			try {
 				System.out.println("Response: " + new String(response, "UTF-8"));

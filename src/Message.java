@@ -98,14 +98,15 @@ public class Message {
 
 		DataInputStream fromPeer = new DataInputStream(in);
 
+
 		int length = fromPeer.readInt();
 
-
+		System.out.println("DECODE LENGTH: " + length);
 		if (length == 0) return KEEP_ALIVE;
 
-		int id = fromPeer.readInt();
+		int id = fromPeer.readByte();
 
-
+		System.out.println(id);
 		switch (id) {
 
 		case CHOKE_ID:
@@ -159,9 +160,10 @@ public class Message {
 
 			case INTERESTED_ID: {
 
-				toPeer.writeInt(message.getLength());
-				toPeer.writeByte(message.getID());
-
+				toPeer.write(keep_alive);
+			//	toPeer.writeInt(message.getLength());
+			//	toPeer.writeByte(message.getID());
+				
 				break;
 			}
 			case UNINTERESTED_ID: {
