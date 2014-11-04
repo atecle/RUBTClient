@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Queue;
+import java.util.Scanner;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.security.MessageDigest;
@@ -24,8 +25,8 @@ public class RUBTClient implements Runnable {
 
 	public int uploaded;
 	public int downloaded;
-	
-	
+
+
 	private static boolean keepRunning;
 
 	public ArrayList<Peer> peer_list;
@@ -45,7 +46,7 @@ public class RUBTClient implements Runnable {
 
 	private static Timer trackerTimer = new Timer("trackerTimer", true);
 	private static TrackerAnnounce announce;
-	
+
 
 	public RUBTClient(Tracker tracker, String outputFile) {
 		this.tracker = tracker;
@@ -97,58 +98,60 @@ public class RUBTClient implements Runnable {
 			System.exit(1);
 		}
 
-		
+
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
-		
-		try {
-			BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-			String input;
-			while ((input = br.readLine()) != null) {
-				if (input.equals("quit")) {
+
+		(new Thread(new Listener())).start();
+
+	}
+	public void run() {
+
+	}
+
+
+	private static class Listener implements Runnable {
+
+		public void run(){
+			Scanner scanner = new Scanner(System.in);
+			while(true){
+				if(scanner.nextLine().equals("quit")){
 					System.exit(1);
+				}else{
+					System.out.println("incorrect input. try typing \"quit\"");
 				}
 			}
-		} catch (IOException e) {
-			System.out.print(e.getMessage());
 		}
-
 	}
-
-
-	public void run() {
-	
-	}
-
 
 	private static class TrackerAnnounce extends TimerTask {
-		
+
 		private final RUBTClient client;
-		
+
 		public TrackerAnnounce(RUBTClient client) {
 			this.client = client;
 		}
-		
+
 		public void run() {
-			
+
 			System.out.println("Sending announce to Tracker");
 			this.client.tracker.update(this.client.uploaded, this.client.downloaded);
 			this.client.tracker.constructURL("");
 			TrackerResponse response = new TrackerResponse(this.client.tracker.sendEvent(""));
-			
+
 			int interval = response.interval();
-			
+
 			if (interval < 60 || interval > 180) {
 				interval = 180;
 			}
-			
+
 			this.client.trackerTimer.schedule(new TrackerAnnounce(this.client), interval * 1000);
-			
+
 		}
 	}
-	
-	
+
+
 	/**
 	 * 
 	 * @param file_name 
