@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.List;
+import java.util.ArrayList;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -33,6 +35,8 @@ public class RUBTClient implements Runnable {
 	public Completed[] completed;
 
 	public String outputFile;
+
+	public List<Peer> peerList;
 
 	public class Completed {
 		public boolean first;
@@ -97,7 +101,9 @@ public class RUBTClient implements Runnable {
 			System.exit(1);
 		}
 
-		
+		client.peerList = new ArrayList<>();
+		client.peerList.add(peer);
+
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
@@ -107,6 +113,10 @@ public class RUBTClient implements Runnable {
 			String input;
 			while ((input = br.readLine()) != null) {
 				if (input.equals("quit")) {
+					for (Peer currPeer : client.peerList) {
+						currPeer.close();
+					}
+					tracker.sendEvent("stopped");
 					System.exit(1);
 				}
 			}
