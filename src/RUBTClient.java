@@ -7,6 +7,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.security.MessageDigest;
@@ -22,6 +23,10 @@ public class RUBTClient implements Runnable {
 	public Tracker tracker;
 
 	public int uploaded;
+	public int downloaded;
+	
+	
+	private static boolean keepRunning;
 
 	public ArrayList<Peer> peer_list;
 
@@ -38,7 +43,9 @@ public class RUBTClient implements Runnable {
 		}
 	}
 
-	private Timer trackerTimer = new Timer("trackerTimer", true);
+	private static Timer trackerTimer = new Timer("trackerTimer", true);
+	private static TrackerAnnounce announce;
+	
 
 	public RUBTClient(Tracker tracker, String outputFile) {
 		this.tracker = tracker;
@@ -47,6 +54,7 @@ public class RUBTClient implements Runnable {
 			this.completed[i] = new Completed();
 		}
 		this.outputFile = outputFile;
+		keepRunning = true;
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -74,7 +82,7 @@ public class RUBTClient implements Runnable {
 		ByteBuffer[] piece_hashes = tracker.getTorrentInfo().piece_hashes;
 		int num_pieces = piece_hashes.length;
 
-		
+
 		TrackerResponse response = new TrackerResponse(tracker.sendEvent("started"));
 
 		RUBTClient client = new RUBTClient(tracker, output_file);
@@ -82,27 +90,57 @@ public class RUBTClient implements Runnable {
 		Peer peer = response.getValidPeers().get(0);
 		peer.setClient(client);
 		System.out.println("Connected " + peer.connectToPeer());
-		
+
 		peer.doHandshake();
 		if (!peer.checkHandshake(tracker.getTorrentInfo().info_hash.array())) {
 			System.out.println("handshake failed");
 			System.exit(1);
 		}
 
-	
-		peer.startThreads();
-		peer.addJob(Message.INTERESTED);	
-	
-		peer.addJob(new Message.RequestMessage(0, 0, 16384));
+		
+		System.out.println(response.interval());
+		announce = new TrackerAnnounce(client);
+		trackerTimer.schedule(announce, response.interval() * 1000 );
+		
+		while (true) {
+			
+		}
 
 	}
 
 
 	public void run() {
-
+	
 	}
 
 
+	private static class TrackerAnnounce extends TimerTask {
+		
+		private final RUBTClient client;
+		
+		public TrackerAnnounce(RUBTClient client) {
+			this.client = client;
+		}
+		
+		public void run() {
+			
+			System.out.println("Sending announce to Tracker");
+			this.client.tracker.update(this.client.uploaded, this.client.downloaded);
+			this.client.tracker.constructURL("");
+			TrackerResponse response = new TrackerResponse(this.client.tracker.sendEvent(""));
+			
+			int interval = response.interval();
+			
+			if (interval < 60 || interval > 180) {
+				interval = 180;
+			}
+			
+			this.client.trackerTimer.schedule(new TrackerAnnounce(this.client), interval * 1000);
+			
+		}
+	}
+	
+	
 	/**
 	 * 
 	 * @param file_name 

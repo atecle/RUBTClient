@@ -41,6 +41,11 @@ public class Tracker {
 		return uploaded;
 	}
 
+	public void update(int uploaded, int downloaded) {
+		this.uploaded = uploaded;
+		this.downloaded = downloaded;
+	}
+	
 	public int getDownloaded() {
 		return downloaded;
 	}

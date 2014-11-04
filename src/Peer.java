@@ -11,6 +11,9 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Formatter;
 
 public class Peer {
 
@@ -67,71 +70,72 @@ public class Peer {
 					break;
 				}
 				switch (message.getID()) {
-					case Message.KEEP_ALIVE_ID:
-						System.out.println("Got keepalive message");
-						break;
-					case Message.CHOKE_ID:
-						System.out.println("Got choke message");
-						choked = true;
-						break;
-					case Message.UNCHOKE_ID:
-						System.out.println("Got unchoke message");
-						synchronized (lock) {
-							choked = false;
-							lock.notifyAll();
+				case Message.KEEP_ALIVE_ID:
+					System.out.println("Got keepalive message");
+					break;
+				case Message.CHOKE_ID:
+					System.out.println("Got choke message");
+					choked = true;
+					break;
+				case Message.UNCHOKE_ID:
+					System.out.println("Got unchoke message");
+					synchronized (lock) {
+						choked = false;
+						lock.notifyAll();
+					}
+					System.out.println("Notified...");
+					break;
+				case Message.INTERESTED_ID:
+					System.out.println("Got interested message");
+					interested = true;
+					jobQueue.offer(Message.UNCHOKE);
+					break;
+				case Message.UNINTERESTED_ID:
+					System.out.println("Got uninterested message");
+					interested = false;
+					jobQueue.offer(Message.CHOKE);
+					break;
+				case Message.HAVE_ID:
+					System.out.println("Got have message");
+					Message.HaveMessage hMessage = (Message.HaveMessage)message;
+					peerCompleted[hMessage.getPieceIndex()] = true;
+					break;
+				case Message.BITFIELD_ID:
+					System.out.println("Got bitfield message");
+					Message.BitFieldMessage bMessage = (Message.BitFieldMessage)message;
+					peerCompleted = bMessage.getCompleted();
+					break;
+				case Message.REQUEST_ID:
+					try {
+						System.out.println("Got request message");
+						Message.RequestMessage rMessage = (Message.RequestMessage)message;
+						int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
+						byte[] data = new byte[rMessage.getLength()];
+						f.read(data, fileOffset, data.length);
+						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
+						jobQueue.offer(piece);
+					} catch (IOException e) {
+						System.out.println(e.getMessage());
+					}
+					break;
+				case Message.PIECE_ID:
+					try {
+						System.out.println("Got piece message");
+						Message.PieceMessage pMessage = (Message.PieceMessage)message;
+						if (pMessage.getOffset() == 0) {
+							client.completed[pMessage.getPieceIndex()].first = true;
+						} else {
+							client.completed[pMessage.getPieceIndex()].second = true;
 						}
-						System.out.println("Notified...");
-						break;
-					case Message.INTERESTED_ID:
-						System.out.println("Got interested message");
-						interested = true;
-						jobQueue.offer(Message.UNCHOKE);
-						break;
-					case Message.UNINTERESTED_ID:
-						System.out.println("Got uninterested message");
-						interested = false;
-						jobQueue.offer(Message.CHOKE);
-						break;
-					case Message.HAVE_ID:
-						System.out.println("Got have message");
-						Message.HaveMessage hMessage = (Message.HaveMessage)message;
-						peerCompleted[hMessage.getPieceIndex()] = true;
-						break;
-					case Message.BITFIELD_ID:
-						System.out.println("Got bitfield message");
-						Message.BitFieldMessage bMessage = (Message.BitFieldMessage)message;
-						peerCompleted = bMessage.getCompleted();
-						break;
-					case Message.REQUEST_ID:
-						try {
-							System.out.println("Got request message");
-							Message.RequestMessage rMessage = (Message.RequestMessage)message;
-							int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
-							byte[] data = new byte[rMessage.getLength()];
-							f.read(data, fileOffset, data.length);
-							Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
-							jobQueue.offer(piece);
-						} catch (IOException e) {
-							System.out.println(e.getMessage());
-						}
-						break;
-					case Message.PIECE_ID:
-						try {
-							System.out.println("Got piece message");
-							Message.PieceMessage pMessage = (Message.PieceMessage)message;
-							if (pMessage.getOffset() == 0) {
-								client.completed[pMessage.getPieceIndex()].first = true;
-							} else {
-								client.completed[pMessage.getPieceIndex()].second = true;
-							}
-							System.out.println(Arrays.toString(client.completed));
-							f.write(pMessage.getPiece(),
-									pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
-									pMessage.getPiece().length);
-						} catch (IOException e) {
-							System.out.println(e.getMessage());
-						}
-						break;
+						//System.out.println(Arrays.toString(client.completed));
+						
+						f.write(pMessage.getPiece(),
+								pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
+								pMessage.getPiece().length);
+					} catch (IOException e) {
+						System.out.println(e.getMessage());
+					}
+					break;
 				}
 			}
 			try {
@@ -220,8 +224,22 @@ public class Peer {
 	}
 
 
-	public boolean listenForUnchoke() {
+	private boolean verifyPiece(Message.PieceMessage pMessage) {
+
+		MessageDigest md = null;
+		try {
+			md = MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+			System.err.println("No such algorithm " + e.getMessage());
+			return false;
+		}
+
 		
+		return Arrays.equals(client.tracker.getTorrentInfo().info_hash.array(), md.digest(pMessage.getPiece()));
+	}
+
+	public boolean listenForUnchoke() {
+
 		try {
 			if (fromPeer.read() == 1 && fromPeer.read() == 1) {
 
@@ -306,11 +324,11 @@ public class Peer {
 	public Message listen() {
 
 		//try {
-			
+
 		//		Message m = Message.decode(fromPeer);
 
 		//		return m;
-			return null;
+		return null;
 		//} catch (EOFException e) {
 		//	System.err.println("EOF Exception in listen " + e.getMessage());
 		//	return null;
