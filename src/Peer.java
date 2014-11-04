@@ -33,6 +33,7 @@ public class Peer {
 
 	private byte[] response;
 
+	public Piece[] pieces = null;
 	private Socket peerSocket;
 	private DataInputStream fromPeer;
 	private DataOutputStream	toPeer;
@@ -119,7 +120,7 @@ public class Peer {
 					}
 					break;
 				case Message.PIECE_ID:
-					try {
+				//	try {
 						System.out.println("Got piece message");
 						Message.PieceMessage pMessage = (Message.PieceMessage)message;
 						if (pMessage.getOffset() == 0) {
@@ -128,13 +129,12 @@ public class Peer {
 							client.completed[pMessage.getPieceIndex()].second = true;
 						}
 						//System.out.println(Arrays.toString(client.completed));
+
+						pieces[pMessage.getPieceIndex()].addPiece(pMessage.getOffset(), pMessage.getPiece());
 						
-						f.write(pMessage.getPiece(),
-								pMessage.getPieceIndex() * client.tracker.getTorrentInfo().piece_length + pMessage.getOffset(),
-								pMessage.getPiece().length);
-					} catch (IOException e) {
-						System.out.println(e.getMessage());
-					}
+				//	} catch (IOException e) {
+				//		System.out.println(e.getMessage());
+				//	}
 					break;
 				}
 			}
@@ -202,8 +202,25 @@ public class Peer {
 	}
 
 	public void setClient(RUBTClient client) {
+		
 		this.client = client;
 		this.peerCompleted = new boolean[client.completed.length];
+		pieces = new Piece[client.tracker.getTorrentInfo().piece_hashes.length];
+		int i;
+		
+		for (i = 0; i < pieces.length - 1; i++) {
+			pieces[i] = new Piece(client.tracker.getTorrentInfo().piece_length);
+		}
+
+		int last_piece_length = client.tracker.getTorrentInfo().file_length % client.tracker.getTorrentInfo().piece_length;
+		
+		if (last_piece_length == 0) {
+			
+			pieces[i] = new Piece(client.tracker.getTorrentInfo().piece_length);
+		}  else  {
+			pieces[i] = new Piece(last_piece_length);
+		}
+		
 	}
 
 
@@ -234,7 +251,7 @@ public class Peer {
 			return false;
 		}
 
-		
+
 		return Arrays.equals(client.tracker.getTorrentInfo().info_hash.array(), md.digest(pMessage.getPiece()));
 	}
 

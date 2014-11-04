@@ -99,11 +99,37 @@ public class RUBTClient implements Runnable {
 		}
 
 
+		(new Thread(new Listener())).start();
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
+		peer.startThreads();
+		peer.addJob(Message.INTERESTED);
+		int i;
+		for (i = 0; i < num_pieces - 1; i++) {
+			System.out.println("Getting piece " + i + " + block 1");
+			peer.addJob(new Message.RequestMessage(i, 0, 16384));
+			
+			System.out.println("Getting piece " + i + " + block 2");
+			peer.addJob(new Message.RequestMessage(i, 16384, 16384));
+		}
+		
+		peer.addJob(new Message.RequestMessage(i, 0, 16384));
+		
+		int last_piece = tracker.getTorrentInfo().file_length % tracker.getTorrentInfo().piece_length;
+		
+		peer.addJob(new Message.RequestMessage(i, 16384, last_piece));
+		
+		RandomAccessFile file = new RandomAccessFile(client.outputFile, "rw");
+	
+		for ( i = 0; i < num_pieces; i++) {
+			file.write(peer.pieces[i].getData());
+		}
+		
+		file.close();
+		peer.close();
 
-		(new Thread(new Listener())).start();
+		
 
 	}
 	public void run() {
