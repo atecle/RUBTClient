@@ -97,7 +97,7 @@ public class Message {
 	public static Message decode(final InputStream in, final int bitlen) throws EOFException, IOException {
 
 		DataInputStream fromPeer = new DataInputStream(in);
-
+		
 		int length = fromPeer.readInt();
 		
 		System.out.println("Message length: " + length);
@@ -105,9 +105,8 @@ public class Message {
 		if (length == 0) return KEEP_ALIVE;
 
 		
-		
 		int id = fromPeer.readByte();
-
+	
 
 		
 		System.out.println("Message " + id);
@@ -129,8 +128,15 @@ public class Message {
 			return new HaveMessage(pieceIndex);
 		}
 		case BITFIELD_ID: {
-			byte[] data = new byte[bitlen];
-			fromPeer.read(data);
+			byte[] data;
+			
+			if (bitlen % 8 == 0) {
+				data = new byte[bitlen/8];
+			} else {
+				data = new byte[bitlen/8 + 1];
+			}
+			
+			fromPeer.readFully(data);
 			return new BitFieldMessage(data);
 		}
 		case REQUEST_ID: {
@@ -144,9 +150,12 @@ public class Message {
 			int begin = fromPeer.readInt();
 			byte[] data = new byte[length - 9];
 			fromPeer.readFully(data);
+			
 			return new PieceMessage(pieceIndex, begin, data);
 		}
+
 		default: 
+		
 			throw new IOException("Bad Message ID:" + id);
 		}
 
@@ -210,7 +219,8 @@ public class Message {
 				toPeer.writeByte(temp.getID());
 				toPeer.writeInt(temp.getIndex());
 				toPeer.writeInt(temp.getOffset());
-				toPeer.writeInt(temp.getLength());
+				toPeer.writeInt(temp.getBlockLength());
+				
 				break;
 			}
 			case BITFIELD_ID: {
@@ -220,7 +230,7 @@ public class Message {
 			}
 
 		}	
-
+		
 		toPeer.flush();
 	}
 
@@ -292,14 +302,14 @@ public class Message {
 	public static class RequestMessage extends Message {
 		private int pieceIndex;
 		private int begin;
-		private int length;
+		private int block_length;
 
 
 		public RequestMessage(int pieceIndex, int begin, int length) {
 			super(REQUEST_ID, 13);
 			this.pieceIndex = pieceIndex;
 			this.begin = begin;
-			this.length = length;
+			this.block_length = length;
 		}
 
 
@@ -311,28 +321,13 @@ public class Message {
 			return begin;
 		}
 
-		public int getLength() {
+		public int getBlockLength() {
 
-			return length;
+			return block_length;
 		}
 
 
 	}
 
-	public static class BitfieldMessage extends Message {
-		private byte[] data;
-
-
-		public BitfieldMessage(byte[] data) {
-			super(BITFIELD_ID, data.length + 1);
-			this.data = data;
-		}
-
-		public byte[] getData() {
-			return data;
-		}
-
-
-	}
 }
 

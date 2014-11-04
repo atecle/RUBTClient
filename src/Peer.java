@@ -58,7 +58,7 @@ public class Peer {
 				Message message;
 				try {
 					System.out.println("Attempting decode");
-					message = Message.decode(fromPeer, peerCompleted.length / 8);
+					message = Message.decode(fromPeer, peerCompleted.length);
 					System.out.println("leaving decode");
 				} catch (EOFException e) {
 					continue;
@@ -275,7 +275,6 @@ public class Peer {
 	private void sendMessage(byte[] message) {
 
 		try {
-
 			this.toPeer.write(message);
 
 		} catch(IOException e) {
