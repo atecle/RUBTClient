@@ -130,10 +130,10 @@ public class Message {
 		case BITFIELD_ID: {
 			byte[] data;
 			
-			if (bitlen % 8 == 0) {
-				data = new byte[bitlen/8];
+			if (bitlen % 8 == 0) {				
+				data = new byte[bitlen/8];					
 			} else {
-				data = new byte[bitlen/8 + 1];
+				data = new byte[bitlen/8 + 1];				//need an extra byte to represent every piece
 			}
 			
 			fromPeer.readFully(data);

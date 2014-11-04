@@ -20,9 +20,9 @@ public class RUBTClient implements Runnable {
 	 * Client's tracker
 	 */
 	public Tracker tracker;
-	
+
 	public int uploaded;
-	
+
 	public ArrayList<Peer> peer_list;
 
 	public Completed[] completed;
@@ -36,16 +36,19 @@ public class RUBTClient implements Runnable {
 			this.first = false;
 			this.second = false;
 		}
-    }
+	}
 
 	private Timer trackerTimer = new Timer("trackerTimer", true);
-	
+
 	public RUBTClient(Tracker tracker, String outputFile) {
 		this.tracker = tracker;
 		this.completed = new Completed[tracker.getTorrentInfo().piece_hashes.length];
+		for (int i = 0; i < this.completed.length; i ++) {
+			this.completed[i] = new Completed();
+		}
 		this.outputFile = outputFile;
 	}
-	
+
 	public static void main(String[] args) throws Exception {
 
 		if (args.length != 2) {
@@ -70,34 +73,36 @@ public class RUBTClient implements Runnable {
 		Tracker tracker = new Tracker(torrent);
 		ByteBuffer[] piece_hashes = tracker.getTorrentInfo().piece_hashes;
 		int num_pieces = piece_hashes.length;
+
 		
 		TrackerResponse response = new TrackerResponse(tracker.sendEvent("started"));
 
 		RUBTClient client = new RUBTClient(tracker, output_file);
-	
+
 		Peer peer = response.getValidPeers().get(0);
 		peer.setClient(client);
 		System.out.println("Connected " + peer.connectToPeer());
-
+		
 		peer.doHandshake();
 		if (!peer.checkHandshake(tracker.getTorrentInfo().info_hash.array())) {
 			System.out.println("handshake failed");
 			System.exit(1);
 		}
-		
 
+	
 		peer.startThreads();
-		peer.addJob(Message.INTERESTED);		
+		peer.addJob(Message.INTERESTED);	
+	
 		peer.addJob(new Message.RequestMessage(0, 0, 16384));
+
 	}
 
 
-	
 	public void run() {
 
 	}
 
-	
+
 	/**
 	 * 
 	 * @param file_name 
