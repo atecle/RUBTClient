@@ -102,8 +102,16 @@ public class RUBTClient implements Runnable {
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
 		
-		while (true) {
-			
+		try {
+			BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+			String input;
+			while ((input = br.readLine()) != null) {
+				if (input.equals("quit")) {
+					System.exit(1);
+				}
+			}
+		} catch (IOException e) {
+			System.out.print(e.getMessage());
 		}
 
 	}
