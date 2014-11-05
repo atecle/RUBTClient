@@ -94,7 +94,7 @@ public class RUBTClient implements Runnable {
 		client.peerList = new ArrayList<Peer>();
 		client.peerList.add(peer);
 
-
+		System.out.println(torrent.file_length%torrent.piece_length);
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
