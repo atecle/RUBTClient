@@ -279,6 +279,7 @@ public class Peer {
 		if (!checkHandshake(client.tracker.getTorrentInfo().info_hash.array())) {
 			System.out.println("handshake failed");
 			close();
+			client.peerList.remove(this);
 			return;
 		}
 		 
