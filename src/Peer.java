@@ -14,7 +14,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Formatter;
-
+/**
+ * 
+ * Handles all communication between peer and client. Maintains state information
+ * 
+ */
 public class Peer {
 
 	private RUBTClient client;
@@ -55,6 +59,11 @@ public class Peer {
 
 	private Object lock = new Object();
 
+	/**
+	 * 
+	 * Producer thread 
+	 *
+	 */
 	private class Producer implements Runnable {
 		private RandomAccessFile f;
 
@@ -210,6 +219,8 @@ public class Peer {
 			if (last_block_length + offset == client.tracker.getTorrentInfo().file_length % client.tracker.getTorrentInfo().piece_length) {
 				if (client.outfile.write(piece)) {
 					downloaded += client.outfile.pieces[piece].getData().length;
+					this.client.setDownloaded(downloaded);
+					
 					jobQueue.offer(new Message.HaveMessage(piece));
 
 					jobQueue.offer(formRequest());

@@ -13,7 +13,11 @@ import java.io.IOException;
 
 
 
-
+/**
+ * Maintains state information about Client - Tracker connection
+ * Maintains connection info between Client - tracker
+ *
+ */
 public class Tracker {
 
 	private static final String ALPHA_NUMERIC_STRING = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -27,7 +31,10 @@ public class Tracker {
 	private int downloaded;
 	private TorrentInfo torrent;
 
-	
+	/**
+	 * Constructor takes TorrentInfo obj
+	 * @param torr
+	 */
 	public Tracker(TorrentInfo torr) {
 		this.torrent = torr;
 		this.peer_id = randomAlphaNumeric();
@@ -37,53 +44,83 @@ public class Tracker {
 		constructURL("");
 	}
 
+	/**
+	 * Get number of bytes uploaded so far
+	 * @return
+	 */
 	public int getUploaded() {
 		return uploaded;
 	}
 
+	/**
+	 * Update download + update fields 
+	 * @param uploaded
+	 * @param downloaded
+	 */
 	public void update(int uploaded, int downloaded) {
 		this.uploaded = uploaded;
 		this.downloaded = downloaded;
 	}
-	
+
+	/**
+	 * Get number of bytes downloaded so far
+	 * @return
+	 */
 	public int getDownloaded() {
 		return downloaded;
 	}
 
-	public void updateProgress(int downloaded, int uploaded) {
-		this.downloaded = downloaded;
-		this.uploaded = uploaded;
-	}
-
+	/**
+	 * Get port this client is listening on
+	 * @return
+	 */
 	public int getPort() {
 		return port;
 	}
 
 
+	/**
+	 * Set port listening on
+	 * @param port
+	 */
 	public void setPort(int port) {
 		this.port = port;
 	}
 
-
+	/**
+	 * get Info hash associated with torrent
+	 * @return
+	 */
 
 	public String getInfoHash() {
 		return info_hash;
 	}
 
-
+	/**
+	 * TorrentInfo obj supplied with constructor
+	 * @return
+	 */
 	public TorrentInfo getTorrentInfo() {
 		return torrent;
 	}
 
+	/**
+	 * Unique alphanumeric ID identifying client 
+	 * @return
+	 */
 	public String getPeerId() {
 		return peer_id;
 	}
 
 
+	/**
+	 * Send 'completed' 'started' 'stopped' or empty message to tracker
+	 * Must be sent at interval specified by Tracker 
+	 */
 	public byte[] sendEvent(String event) {
 
 		HttpURLConnection connection = sendGet(event);
-		
+
 		DataInputStream in = null;
 		ByteArrayOutputStream bencoded_response = null;
 		try {
@@ -106,7 +143,8 @@ public class Tracker {
 	}
 
 
-	public HttpURLConnection sendGet(String event) {
+	
+	private HttpURLConnection sendGet(String event) {
 
 		URL trackerURL = null;
 		HttpURLConnection conn = null;

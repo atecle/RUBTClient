@@ -8,7 +8,11 @@ import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-
+/**
+ * Encapsulate messages exchanged between peers. 
+ * 
+ *
+ */
 public class Message {
 
 	private final static byte[] handshake_header = {0x13,'B','i','t','T','o','r','r','e','n','t',' ',
@@ -47,6 +51,11 @@ public class Message {
 
 
 
+	/**
+	 * Constructor for base class
+	 * @param id
+	 * @param length
+	 */
 	protected Message(final byte id, int length) {
 		this.id = id;
 		this.length = length;
@@ -94,24 +103,32 @@ public class Message {
 		return handshake;
 	}
 
+	/**
+	 * Given Inputstream associated with peer socket, decode messages sent into Message object according to message ID
+	 * @param in
+	 * @param bitlen
+	 * @return
+	 * @throws EOFException
+	 * @throws IOException
+	 */
 	public static Message decode(final InputStream in, final int bitlen) throws EOFException, IOException {
 
 		DataInputStream fromPeer = new DataInputStream(in);
-	
+
 		int length = fromPeer.readInt();
-		
+
 		System.out.println("Message length in decode: " + length);
 
 		if (length == 0) return KEEP_ALIVE;
 
-		
-		int id = fromPeer.readByte();
-	
 
-		
+		int id = fromPeer.readByte();
+
+
+
 		System.out.println("Message " + id);
-		
-		
+
+
 
 		switch (id) {
 
@@ -129,13 +146,13 @@ public class Message {
 		}
 		case BITFIELD_ID: {
 			byte[] data;
-			
+
 			if (bitlen % 8 == 0) {				
 				data = new byte[bitlen/8];					
 			} else {
 				data = new byte[bitlen/8 + 1];				//need an extra byte to represent every piece
 			}
-			
+
 			fromPeer.readFully(data);
 			return new BitFieldMessage(data);
 		}
@@ -151,17 +168,23 @@ public class Message {
 			int begin = fromPeer.readInt();
 			byte[] data = new byte[length - 9];
 			fromPeer.readFully(data);
-			
+
 			return new PieceMessage(pieceIndex, begin, data);
 		}
 
 		default: 
-		
+
 			throw new IOException("Bad Message ID:" + id);
 		}
 
 	}
 
+	/**
+	 * Given OutputStream associated with peer socket, send client message using proper <length><id><payload> format
+	 * @param out
+	 * @param message
+	 * @throws IOException
+	 */
 	public static void encode(final OutputStream out, Message message) 
 			throws IOException {
 
@@ -222,7 +245,7 @@ public class Message {
 				toPeer.writeInt(temp.getOffset());
 				toPeer.writeInt(temp.getBlockLength());
 				System.out.println("Just encoded a request for piece " + temp.getIndex() + " " + temp.getOffset() + " " + temp.getBlockLength());
-				
+
 				break;
 			}
 			case BITFIELD_ID: {
@@ -232,10 +255,15 @@ public class Message {
 			}
 
 		}	
-		
+
 		toPeer.flush();
 	}
 
+	/**
+	 * Bitfield subclass
+	 *
+	 *
+	 */
 	public static class BitFieldMessage extends Message {
 		private boolean[] completed;
 		private byte[] data;
@@ -253,15 +281,20 @@ public class Message {
 				completed[i] = val;
 				i++;
 			}
-			
+
 			this.data = data;
 		}
-		
+
 		public byte[] getData() {
 			return data;
 		}
 	}
 
+	/**
+	 * Have Message subclass
+	 * 
+	 *
+	 */
 	public static class HaveMessage extends Message {
 
 		private int pieceIndex;
@@ -277,6 +310,9 @@ public class Message {
 
 	}
 
+	/**
+	 * PieceMessage subclass
+	 */
 	public static class PieceMessage extends Message {
 
 		private int pieceIndex;
@@ -309,6 +345,11 @@ public class Message {
 
 	}
 
+	/**
+	 * Request Message subclass
+	 * @author Tecle
+	 *
+	 */
 	public static class RequestMessage extends Message {
 		private int pieceIndex;
 		private int begin;
