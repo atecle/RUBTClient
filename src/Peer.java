@@ -462,9 +462,11 @@ public class Peer {
 
 	}
 
+	public String getPeerId() {
+		return peer_id;
+	}
 
 	public boolean checkHandshake(byte[] info_hash) {
-
 		byte[] response_hash = new byte[20];
 		byte[] response = new byte[HEADER_SIZE];
 
