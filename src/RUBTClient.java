@@ -6,6 +6,7 @@ import java.nio.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -51,6 +52,8 @@ public class RUBTClient implements Runnable {
 			this.second = false;
 		}
 	}
+
+	public Thread peerListener;
 
 	private static Timer trackerTimer = new Timer("trackerTimer", true);
 	private static TrackerAnnounce announce;
@@ -113,6 +116,9 @@ public class RUBTClient implements Runnable {
 		trackerTimer.schedule(announce, response.interval() * 1000 );
 		peer.startThreads();
 
+		client.peerListener = new Thread(client.new PeerListener());
+		client.peerListener.start();
+
 		try {
 			BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 			String input;
@@ -164,19 +170,14 @@ public class RUBTClient implements Runnable {
 	}
 
 	private class PeerListener implements Runnable {
-		private int port;
-
-		public PeerListener(int port) {
-			this.port = port;
-		}
-
 		public void run() {
+			int port = 6881;
 			while (true) {
-				try (
+				try {
 					ServerSocket serverSocket = new ServerSocket(port);
 					Socket clientSocket = serverSocket.accept();
 					DataInputStream fromPeer = new DataInputStream(clientSocket.getInputStream());
-				) {
+
 					byte[] response_hash = new byte[20];
 					byte[] response_id = new byte[20];
 					byte[] response = new byte[HEADER_SIZE];
@@ -225,7 +226,13 @@ public class RUBTClient implements Runnable {
 					if (validHandshake) {
 						Peer peer = new Peer(clientSocket.getInetAddress().toString(), new String(response_id, "UTF-8"), clientSocket.getPort());
 						peer.setClient(RUBTClient.this);
+						peer.startThreads();
+						peer_queue.add(peer);
 					}
+				} catch (SocketTimeoutException e) {
+					port++;
+					if (port > 6998)
+						port = 6881;
 				} catch (IOException e) {
 					System.out.println("Caught IOException listening for new peers");
 					break;
