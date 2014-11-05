@@ -14,7 +14,8 @@ public class Piece {
 	public void addPiece(int offset, byte[] data) {
 		
 		for (int i = 0; i < data.length; i++) {
-			data[offset+i] = data[i];
+		
+			this.data[offset+i] = data[i];
 		}
 		
 		this.offset = offset;

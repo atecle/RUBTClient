@@ -33,20 +33,12 @@ public class RUBTClient implements Runnable {
 
 	public ArrayList<Peer> peer_list;
 
-	public Completed[] completed;
-
 	public String outputFile;
+	
+	public OutFile outfile;
 
 	public List<Peer> peerList;
 
-	public class Completed {
-		public boolean first;
-		public boolean second;
-		public Completed() {
-			this.first = false;
-			this.second = false;
-		}
-	}
 
 	private static Timer trackerTimer = new Timer("trackerTimer", true);
 	private static TrackerAnnounce announce;
@@ -54,11 +46,9 @@ public class RUBTClient implements Runnable {
 
 	public RUBTClient(Tracker tracker, String outputFile) {
 		this.tracker = tracker;
-		this.completed = new Completed[tracker.getTorrentInfo().piece_hashes.length];
-		for (int i = 0; i < this.completed.length; i ++) {
-			this.completed[i] = new Completed();
-		}
+		
 		this.outputFile = outputFile;
+		outfile = new OutFile(tracker.getTorrentInfo());
 		keepRunning = true;
 	}
 
@@ -96,14 +86,10 @@ public class RUBTClient implements Runnable {
 		peer.setClient(client);
 		System.out.println("Connected " + peer.connectToPeer());
 
-		peer.doHandshake();
-		if (!peer.checkHandshake(tracker.getTorrentInfo().info_hash.array())) {
-			System.out.println("handshake failed");
-			System.exit(1);
-		}
+	
 
-
-
+		
+		client.outfile.setClient(client);
 
 		client.peerList = new ArrayList<Peer>();
 		client.peerList.add(peer);
@@ -113,8 +99,10 @@ public class RUBTClient implements Runnable {
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
 		peer.startThreads();
-		peer.addJob(Message.INTERESTED);
-		int i;
+	
+		
+		
+		/*int i;
 		for (i = 0; i < num_pieces - 1; i++) {
 			System.out.println("Getting piece " + i + " + block 1");
 			peer.addJob(new Message.RequestMessage(i, 0, 16384));
@@ -127,7 +115,7 @@ public class RUBTClient implements Runnable {
 		peer.addJob(new Message.RequestMessage(i, 0, 16384));
 
 		int last_piece = tracker.getTorrentInfo().file_length % tracker.getTorrentInfo().piece_length;
-
+		System.out.println(tracker.getTorrentInfo().piece_length);
 		peer.addJob(new Message.RequestMessage(i, 16384, last_piece));
 
 		RandomAccessFile file = new RandomAccessFile(client.outputFile, "rw");
@@ -149,13 +137,12 @@ public class RUBTClient implements Runnable {
 				}
 			} catch (IOException e) {
 				System.out.print(e.getMessage());
-
 			}
 
 			file.close();
 			peer.close();
 		}
-
+*/
 
 	}
 	public void run() {

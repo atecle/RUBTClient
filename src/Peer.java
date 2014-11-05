@@ -30,8 +30,14 @@ public class Peer {
 	private boolean connected;
 	private boolean interested;
 	private boolean peer_interested;
+	private boolean first_sent;
 
-	private byte[] response;
+	private int downloaded;
+	private int uploaded;
+
+	public static final int max_length = 16384;
+
+	private byte[] bitfield;
 
 	public Piece[] pieces = null;
 	private Socket peerSocket;
@@ -84,7 +90,14 @@ public class Peer {
 						choked = false;
 						lock.notifyAll();
 					}
+
 					System.out.println("Notified...");
+
+					Message.RequestMessage request = formRequest();
+					System.out.println("Sending request "  + request.getIndex() + "  " + request.getOffset() + "  " + request.getBlockLength());
+					jobQueue.offer(request);
+
+
 					break;
 				case Message.INTERESTED_ID:
 					System.out.println("Got interested message");
@@ -103,8 +116,22 @@ public class Peer {
 					break;
 				case Message.BITFIELD_ID:
 					System.out.println("Got bitfield message");
+
+					if (!firstSent()) {
+						setFirstSent(true);
+					} else {
+						close();
+						return;
+					}
 					Message.BitFieldMessage bMessage = (Message.BitFieldMessage)message;
+					bitfield = bMessage.getData();
 					peerCompleted = bMessage.getCompleted();
+
+					if (client.outfile.needPiece(bitfield) != -1) {
+						interested = true;
+
+						jobQueue.offer(Message.INTERESTED);
+					}
 					break;
 				case Message.REQUEST_ID:
 					try {
@@ -120,21 +147,14 @@ public class Peer {
 					}
 					break;
 				case Message.PIECE_ID:
-				//	try {
-						System.out.println("Got piece message");
-						Message.PieceMessage pMessage = (Message.PieceMessage)message;
-						if (pMessage.getOffset() == 0) {
-							client.completed[pMessage.getPieceIndex()].first = true;
-						} else {
-							client.completed[pMessage.getPieceIndex()].second = true;
-						}
-						//System.out.println(Arrays.toString(client.completed));
+					//	try {
+					System.out.println("Got piece message");
 
-						pieces[pMessage.getPieceIndex()].addPiece(pMessage.getOffset(), pMessage.getPiece());
-						
-				//	} catch (IOException e) {
-				//		System.out.println(e.getMessage());
-				//	}
+					Message.PieceMessage pMessage = (Message.PieceMessage)message;
+					System.out.println("this piece " + pMessage.getPieceIndex() + " " + pMessage.getOffset() + " " + pMessage.getPieceLength());
+					client.outfile.completed[pMessage.getPieceIndex()].first = true;
+					requestNextPiece(pMessage);
+
 					break;
 				}
 			}
@@ -177,16 +197,95 @@ public class Peer {
 		}
 	}
 
+	private void requestNextPiece(Message.PieceMessage pMessage) {
+
+		client.outfile.addBlock(pMessage);
+		int last_block_length = (client.tracker.getTorrentInfo().file_length%client.tracker.getTorrentInfo().piece_length)%max_length;
+		int piece = pMessage.getPieceIndex();
+		int offset = pMessage.getOffset();
+		
+	
+		if (piece == (client.tracker.getTorrentInfo().piece_hashes.length - 1)) {
+
+			if (last_block_length + offset == client.tracker.getTorrentInfo().file_length % client.tracker.getTorrentInfo().piece_length) {
+				if (client.outfile.write(piece)) {
+					downloaded += client.outfile.pieces[piece].getData().length;
+					jobQueue.offer(new Message.HaveMessage(piece));
+
+					jobQueue.offer(formRequest());
+				} else {
+					//sha check failed. 
+				}
+			} else {
+				jobQueue.offer(new Message.RequestMessage(piece, max_length + offset, last_block_length));
+			}
+		} else if ( max_length + offset == client.tracker.getTorrentInfo().piece_length) {
+			if (client.outfile.write(piece)) {
+				System.out.println("SHA SUCCESS");
+				downloaded += client.outfile.pieces[piece].getData().length;
+				jobQueue.offer(new Message.HaveMessage(piece));
+				
+				Message.RequestMessage m = formRequest();
+				jobQueue.offer(m);
+				System.out.println("just sent request for piece " + m.getIndex());
+				
+			} else {
+				System.out.println("SHA FAILED");
+			}
+		} else {
+			
+			jobQueue.offer(new Message.RequestMessage(piece, max_length + offset, max_length));
+		}
+		
+		
+
+	}
+	private Message.RequestMessage formRequest() {
+
+		int piece;
+		int offset = 0;
+
+		if ((piece = client.outfile.needPiece(bitfield)) == -1) { 
+		
+			interested = false;
+			return null;
+		}
+
+		if (client.outfile.pieces[piece].getOffset() != 0) {
+			offset += max_length;
+		}
+
+		System.out.println("forming request for piece " + piece);
+		return (new Message.RequestMessage(piece, offset, max_length));
+	}
 	public void startThreads() {
+
+		doHandshake();
+
+		if (!checkHandshake(client.tracker.getTorrentInfo().info_hash.array())) {
+			System.out.println("handshake failed");
+			close();
+			return;
+		}
+
 		this.producer = new Thread(this.new Producer());
 		this.consumer = new Thread(this.new Consumer());
 		this.jobQueue = new ConcurrentLinkedQueue<Message>();
 		this.producer.start();
 		this.consumer.start();
+
 	}
 
 	public boolean addJob(Message message) {
 		return jobQueue.offer(message);
+	}
+
+	private boolean firstSent() {
+		return first_sent;
+	}
+
+	private void setFirstSent(boolean first_sent) {
+		this.first_sent = first_sent;
 	}
 
 	public Peer(String ip, String peer_id, int port) {
@@ -198,29 +297,30 @@ public class Peer {
 		this.peer_choking = true;
 		this.connected = false;
 		this.interested = false;
+		this.first_sent = false;
 		this.stopProducing = false;
 	}
 
 	public void setClient(RUBTClient client) {
-		
+
 		this.client = client;
-		this.peerCompleted = new boolean[client.completed.length];
+		this.peerCompleted = new boolean[client.outfile.completed.length];
 		pieces = new Piece[client.tracker.getTorrentInfo().piece_hashes.length];
 		int i;
-		
+
 		for (i = 0; i < pieces.length - 1; i++) {
 			pieces[i] = new Piece(client.tracker.getTorrentInfo().piece_length);
 		}
 
 		int last_piece_length = client.tracker.getTorrentInfo().file_length % client.tracker.getTorrentInfo().piece_length;
-		
+
 		if (last_piece_length == 0) {
-			
+
 			pieces[i] = new Piece(client.tracker.getTorrentInfo().piece_length);
 		}  else  {
 			pieces[i] = new Piece(last_piece_length);
 		}
-		
+
 	}
 
 
@@ -241,19 +341,6 @@ public class Peer {
 	}
 
 
-	private boolean verifyPiece(Message.PieceMessage pMessage) {
-
-		MessageDigest md = null;
-		try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-			System.err.println("No such algorithm " + e.getMessage());
-			return false;
-		}
-
-
-		return Arrays.equals(client.tracker.getTorrentInfo().info_hash.array(), md.digest(pMessage.getPiece()));
-	}
 
 	public boolean listenForUnchoke() {
 

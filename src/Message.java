@@ -97,10 +97,10 @@ public class Message {
 	public static Message decode(final InputStream in, final int bitlen) throws EOFException, IOException {
 
 		DataInputStream fromPeer = new DataInputStream(in);
-		
+	
 		int length = fromPeer.readInt();
 		
-		System.out.println("Message length: " + length);
+		System.out.println("Message length in decode: " + length);
 
 		if (length == 0) return KEEP_ALIVE;
 
@@ -147,6 +147,7 @@ public class Message {
 		}
 		case PIECE_ID: {
 			int pieceIndex = fromPeer.readInt();
+			System.out.println("decoding piece " + pieceIndex);
 			int begin = fromPeer.readInt();
 			byte[] data = new byte[length - 9];
 			fromPeer.readFully(data);
@@ -220,6 +221,7 @@ public class Message {
 				toPeer.writeInt(temp.getIndex());
 				toPeer.writeInt(temp.getOffset());
 				toPeer.writeInt(temp.getBlockLength());
+				System.out.println("Just encoded a request for piece " + temp.getIndex() + " " + temp.getOffset() + " " + temp.getBlockLength());
 				
 				break;
 			}
@@ -236,6 +238,7 @@ public class Message {
 
 	public static class BitFieldMessage extends Message {
 		private boolean[] completed;
+		private byte[] data;
 
 		public boolean[] getCompleted() {
 			return completed;
@@ -250,6 +253,12 @@ public class Message {
 				completed[i] = val;
 				i++;
 			}
+			
+			this.data = data;
+		}
+		
+		public byte[] getData() {
+			return data;
 		}
 	}
 
@@ -279,6 +288,7 @@ public class Message {
 			super(PIECE_ID, data.length + 9);
 			this.offset = begin;
 			this.data = data;
+			this.pieceIndex = pieceIndex;
 
 		}
 		public int getPieceIndex() {
