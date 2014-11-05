@@ -9,6 +9,7 @@ import java.util.Arrays;
 
 public class OutFile {
 
+	public int sum = 0;
 	private RandomAccessFile file;
 	private TorrentInfo torrent;
 	private byte[] client_bitfield;
@@ -109,23 +110,20 @@ public class OutFile {
 
 	public int needPiece(byte[] peer_bitfield) {
 
-		int piece_index = 0;
+		//int piece_index = 0;
 
-		for (int i = 0; i < peer_bitfield.length; i++) {
-			for (int j = 1; j <= 8; j++) {
-				boolean peer_has = ((peer_bitfield[i] >> j) & 1) == 1;
-				boolean client_has = ((client_bitfield[i] >> j) & 1) == 1;
+		for (int i = 0; i < torrent.piece_hashes.length; i++) {
+			int m = i%8;
+			int byte_index = (i-m) / 8;
 
-				if (peer_has && !client_has && (!completed[piece_index].first && !completed[piece_index].second)) { 
-					System.out.println("need piece " + piece_index + " from peer.");
-					
-					return piece_index;
-
+			if ((client_bitfield[byte_index] >> (7-m) & 1) != 1){
+				if ((peer_bitfield[byte_index] >> (7-m) & 1) == 1) {
+					if (!completed[i].first && !completed[i].second) {
+						return i;
+					}
 				}
-				piece_index++;
 			}
 		}
-
 		return -1;
 	}
 
@@ -136,6 +134,7 @@ public class OutFile {
 		}
 		try {
 			System.out.println("WRITING PIECE " + piece_index);
+			sum+=piece_index;
 			file.seek((long)piece_index*torrent.piece_length);
 			file.write(pieces[piece_index].getData());
 			completed[piece_index].second = true;
@@ -145,6 +144,7 @@ public class OutFile {
 			if (incomplete <= 0 || piece_index == 435) {
 				//ready to seed
 				close();
+				System.out.println("piece sum " + sum);
 				System.exit(1);
 			}
 
@@ -172,9 +172,9 @@ public class OutFile {
 
 		for (int i = 0; i < pieces.length; i++) {
 			int m = i%8;
-			int byte_index = (i-m)/8;
+			int byte_index = (i-(m))/8;
 			if (completed[i].first && completed[i].second) {
-				
+
 				client_bitfield[byte_index] |= (1 << (7-m));
 			} else {
 				client_bitfield[byte_index] &= ~(1 << (7-m));
@@ -182,7 +182,7 @@ public class OutFile {
 
 		}
 	}
-	
+
 	private boolean verifyPiece(byte[] message) {
 
 		MessageDigest md = null;

@@ -214,7 +214,7 @@ public class Peer {
 
 					jobQueue.offer(formRequest());
 				} else {
-					//sha check failed. 
+					System.out.println("SHA FAILED"); System.exit(1); 
 				}
 			} else {
 				jobQueue.offer(new Message.RequestMessage(piece, max_length + offset, last_block_length));
