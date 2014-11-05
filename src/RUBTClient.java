@@ -31,6 +31,7 @@ public class RUBTClient implements Runnable {
 
 	public int uploaded;
 	public int downloaded;
+	public static boolean seeding;
 
 
 	private static boolean keepRunning;
@@ -59,6 +60,7 @@ public class RUBTClient implements Runnable {
 		this.outputFile = outputFile;
 		outfile = new OutFile(tracker.getTorrentInfo());
 		keepRunning = true;
+		seeding = false;
 	}
 
 	/**
@@ -109,6 +111,20 @@ public class RUBTClient implements Runnable {
 		client.peerList = new ArrayList<Peer>();
 		client.peerList.add(peer);
 
+		File file = new File(output_file);
+
+		int complete = -1;
+		if (file.exists()) {
+			complete = client.outfile.loadState();
+
+		} else {
+			client.outfile.createFile();
+		}
+
+		if (complete == 1) seeding = true;
+		
+		 (new Thread(new Listener(client))).start();
+
 		System.out.println(torrent.file_length%torrent.piece_length);
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
@@ -120,11 +136,17 @@ public class RUBTClient implements Runnable {
 
 
 	private static class Listener implements Runnable {
-
+		
+		RUBTClient client;
+		
+		public Listener(RUBTClient client) {
+			this.client = client;
+		}
 		public void run(){
 			Scanner scanner = new Scanner(System.in);
 			while(true){
 				if(scanner.nextLine().equals("quit")){
+					client.outfile.close();
 					System.exit(1);
 				}else{
 					System.out.println("incorrect input. try typing \"quit\"");
@@ -263,7 +285,7 @@ public class RUBTClient implements Runnable {
 	@Override
 	public void run() {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 }

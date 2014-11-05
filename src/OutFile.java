@@ -16,12 +16,13 @@ public class OutFile {
 	public int sum = 0;
 	private RandomAccessFile file;
 	private TorrentInfo torrent;
-	private byte[] client_bitfield;
+	public byte[] client_bitfield;
 	public Piece[] pieces;
 	private RUBTClient client;
 	private int incomplete;
 	private int file_size;
 	private String filename;
+	private boolean created;
 
 	public Completed[] completed; 
 
@@ -41,7 +42,7 @@ public class OutFile {
 		file_size = torrent.file_length;
 		incomplete = file_size;
 		filename = torrent.file_name;
-
+		created = false;
 		pieces = new Piece[torrent.piece_hashes.length];
 
 		int i;
@@ -71,14 +72,6 @@ public class OutFile {
 			this.completed[i] = new Completed();
 		}
 
-		try {
-			file = new RandomAccessFile(filename, "rw");
-
-		} catch (FileNotFoundException e) {
-			System.out.println("FileNotFoundException initializing RAF " + e.getMessage());
-		} 
-
-
 	}
 
 	/**
@@ -89,12 +82,57 @@ public class OutFile {
 		this.client = client;
 	}
 
+
+	public void createFile() {
+		try {
+			file = new RandomAccessFile(filename, "rw");
+			created = true;
+		} catch (FileNotFoundException e) {
+			System.out.println("FileNotFoundException initializing RAF " + e.getMessage());
+		} 
+	}
+	public int loadState() {
+
+		byte[] piece = null;
+		int complete = 1;
+		
+		if (!created) createFile();
+
+		for (int i = 0; i < pieces.length; i++) {
+			if (i == (pieces.length - 1)) {
+				piece = new byte[torrent.file_length%torrent.piece_length];
+			} else {
+				piece = new byte[torrent.piece_length];
+			}
+
+			try {
+				file.seek(torrent.piece_length*i);
+				file.read(piece);
+				if (verifyPiece(piece) == i) {
+					completed[i].first = true;
+					completed[i].second = true;
+					incomplete -= pieces[i].getData().length;
+				} else {
+					complete = - 1;
+					completed[i].first = false;
+					completed[i].second = false;
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+		}
+		
+		updateBitfield();
 	
+		return complete;
+	}
+
 	/**
 	 * adds first block of piece message to to Piece[] array. 
 	 * @param pMessage
 	 */
-	
+
 	public void addBlock(Message.PieceMessage pMessage) {
 
 
@@ -142,7 +180,7 @@ public class OutFile {
 	 */
 	public boolean write(int piece_index) {
 
-		if (!verifyPiece(pieces[piece_index].getData())) {
+		if (verifyPiece(pieces[piece_index].getData()) == -1) {
 			return false;
 		}
 		try {
@@ -151,13 +189,16 @@ public class OutFile {
 			file.seek((long)piece_index*torrent.piece_length);
 			file.write(pieces[piece_index].getData());
 			completed[piece_index].second = true;
-
+			this.client.setDownloaded(pieces[piece_index].getData().length);
+			
 			incomplete -= pieces[piece_index].getData().length;
 			updateBitfield();
-			
+
 			if (incomplete <= 0 || piece_index == torrent.file_length% torrent.piece_length) {		// done downloading
 				client.tracker.update(client.uploaded, client.downloaded);
 				client.tracker.constructURL("completed");
+				System.out.println("completed");
+				
 				client.tracker.sendEvent("completed");
 				close();
 			}
@@ -172,7 +213,7 @@ public class OutFile {
 	}
 
 
-	private void close() {
+	public void close() {
 
 		try {
 			file.close();
@@ -182,7 +223,7 @@ public class OutFile {
 	}
 
 
-	private void updateBitfield() {
+	public void updateBitfield() {
 
 		for (int i = 0; i < pieces.length; i++) {
 			int m = i%8;
@@ -197,14 +238,14 @@ public class OutFile {
 		}
 	}
 
-	private boolean verifyPiece(byte[] message) {
+	private int verifyPiece(byte[] message) {
 
 		MessageDigest md = null;
 		try {
 			md = MessageDigest.getInstance("SHA-1");
 		} catch (NoSuchAlgorithmException e) {
 			System.err.println("No such algorithm " + e.getMessage());
-			return false;
+			return -1;
 		}
 
 
@@ -215,12 +256,12 @@ public class OutFile {
 
 		for (int i = 0; i < torrent.piece_hashes.length; i++) {
 			if (Arrays.equals(piece_hash, torrent.piece_hashes[i].array())) {
-				return true;
+				return i;
 			}
 		}
 
 
-		return false;
+		return -1;
 	}
 
 	private void initializeBitField() {

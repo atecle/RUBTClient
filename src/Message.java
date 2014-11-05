@@ -115,8 +115,9 @@ public class Message {
 
 		DataInputStream fromPeer = new DataInputStream(in);
 
+		
 		int length = fromPeer.readInt();
-
+		
 		System.out.println("Message length in decode: " + length);
 
 		if (length == 0) return KEEP_ALIVE;
@@ -249,7 +250,10 @@ public class Message {
 				break;
 			}
 			case BITFIELD_ID: {
-				//TODO
+				BitFieldMessage temp = (BitFieldMessage) message;
+				toPeer.write(temp.getLength());
+				toPeer.writeByte(temp.getID());
+				toPeer.write(temp.getData(), 0, temp.getData().length);
 			}
 
 			}

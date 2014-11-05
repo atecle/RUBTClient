@@ -36,6 +36,7 @@ public class Peer {
 	private boolean peer_interested;
 	private boolean first_sent;
 
+
 	private int downloaded;
 	private int uploaded;
 
@@ -219,11 +220,11 @@ public class Peer {
 			if (last_block_length + offset == client.tracker.getTorrentInfo().file_length % client.tracker.getTorrentInfo().piece_length) {
 				if (client.outfile.write(piece)) {
 					downloaded += client.outfile.pieces[piece].getData().length;
-					this.client.setDownloaded(downloaded);
+					
 					
 					jobQueue.offer(new Message.HaveMessage(piece));
-
-					jobQueue.offer(formRequest());
+					
+					return;
 				} else {
 					System.out.println("SHA FAILED"); System.exit(1); 
 				}
@@ -270,7 +271,9 @@ public class Peer {
 		return (new Message.RequestMessage(piece, offset, max_length));
 	}
 	public void startThreads() {
-
+		
+		this.jobQueue = new ConcurrentLinkedQueue<Message>();
+		
 		doHandshake();
 
 		if (!checkHandshake(client.tracker.getTorrentInfo().info_hash.array())) {
@@ -278,10 +281,10 @@ public class Peer {
 			close();
 			return;
 		}
-
+		 
+		//jobQueue.offer(new Message.BitFieldMessage(this.client.outfile.client_bitfield));
 		this.producer = new Thread(this.new Producer());
 		this.consumer = new Thread(this.new Consumer());
-		this.jobQueue = new ConcurrentLinkedQueue<Message>();
 		this.producer.start();
 		this.consumer.start();
 
