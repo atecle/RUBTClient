@@ -1,8 +1,17 @@
 import java.util.Iterator;
 
+/**
+ * Used to iterate through byte[] returning boolean for each bit.
+ *
+ *
+ */
 public class ByteArrayBitIterable implements Iterable<Boolean> {
     private final byte[] array;
 
+    /**
+     * Constructor takes byte[] array to be iterated over
+     * @param array
+     */
     public ByteArrayBitIterable(byte[] array) {
         this.array = array;
     }

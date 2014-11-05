@@ -3,7 +3,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 
-
+/**
+ * Encapsulates tracker response 
+ *
+ *
+ */
 
 public class TrackerResponse {
 	
@@ -56,7 +60,10 @@ public class TrackerResponse {
 	 * Key used to retrieve the peer ip from the tracker response.
 	 */
 	public final static ByteBuffer PEER_IP_KEY = ByteBuffer.wrap(new byte[]{ 'i', 'p'});
-	
+	/**
+	 * Constructor takes bencoded tracker reply, parses, and initializes fields
+	 * @param bencoded_response
+	 */
 	@SuppressWarnings("rawtypes")
 	public TrackerResponse(byte[] bencoded_response) {
 		
@@ -84,14 +91,26 @@ public class TrackerResponse {
 		
 	}
 	
+	/**
+	 * Current list of peers connected to tracker
+	 * @return
+	 */
 	public ArrayList<Peer> getPeerList() {
 		return peer_list;
 	}
 	
+	/**
+	 * Minimum interval at which we must update tracker to generate new tracker response
+	 * @return
+	 */
 	public int minInterval() {
 		return min_interval;
 	}
 	
+	/**
+	 * Get list of peers we may download from
+	 * @return
+	 */
 	public ArrayList<Peer> getValidPeers() {
 		
 		ArrayList<Peer> valid_peers = new ArrayList<Peer>(2);
@@ -103,10 +122,18 @@ public class TrackerResponse {
 		return valid_peers;
 	}
 	
+	/**
+	 * interval at which we may update tracker to generate new tracker response
+	 * @return
+	 */
 	public int interval() {
 		return interval;
 	}
 	
+	
+	/**
+	 * prints connected peers' ID and IP 
+	 */
 	public void printPeers() {
 		
 		for (int i = 0; i < peer_list.size(); i++) {

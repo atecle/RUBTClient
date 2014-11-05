@@ -17,7 +17,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 
-
+/**
+ * Main client app. Gets command line arguments for torrent file path and output file destination.Spawns threads to begin p2p connection
+ * @author Tecle
+ *
+ */
 public class RUBTClient implements Runnable {
 
 	/**
@@ -34,7 +38,7 @@ public class RUBTClient implements Runnable {
 	public ArrayList<Peer> peer_list;
 
 	public String outputFile;
-	
+
 	public OutFile outfile;
 
 	public List<Peer> peerList;
@@ -43,14 +47,25 @@ public class RUBTClient implements Runnable {
 	private static Timer trackerTimer = new Timer("trackerTimer", true);
 	private static TrackerAnnounce announce;
 
+	/**
+	 * Constructor for RUBTClient obj
+	 * @param tracker
+	 * @param outputFile
+	 */
 
 	public RUBTClient(Tracker tracker, String outputFile) {
 		this.tracker = tracker;
-		
+
 		this.outputFile = outputFile;
 		outfile = new OutFile(tracker.getTorrentInfo());
 		keepRunning = true;
 	}
+
+	/**
+	 * Initializes fields and begins worker threads
+	 * @param args
+	 * @throws Exception
+	 */
 
 	public static void main(String[] args) throws Exception {
 
@@ -86,9 +101,9 @@ public class RUBTClient implements Runnable {
 		peer.setClient(client);
 		System.out.println("Connected " + peer.connectToPeer());
 
-	
 
-		
+
+
 		client.outfile.setClient(client);
 
 		client.peerList = new ArrayList<Peer>();
@@ -99,53 +114,7 @@ public class RUBTClient implements Runnable {
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
 		peer.startThreads();
-	
-		
-		
-		/*int i;
-		for (i = 0; i < num_pieces - 1; i++) {
-			System.out.println("Getting piece " + i + " + block 1");
-			peer.addJob(new Message.RequestMessage(i, 0, 16384));
 
-			System.out.println("Getting piece " + i + " + block 2");
-			peer.addJob(new Message.RequestMessage(i, 16384, 16384));
-		}
-
-
-		peer.addJob(new Message.RequestMessage(i, 0, 16384));
-
-		int last_piece = tracker.getTorrentInfo().file_length % tracker.getTorrentInfo().piece_length;
-		System.out.println(tracker.getTorrentInfo().piece_length);
-		peer.addJob(new Message.RequestMessage(i, 16384, last_piece));
-
-		RandomAccessFile file = new RandomAccessFile(client.outputFile, "rw");
-
-		for ( i = 0; i < num_pieces; i++) {
-			file.write(peer.pieces[i].getData());
-
-			try {
-				BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-				String input;
-				while ((input = br.readLine()) != null) {
-					if (input.equals("quit")) {
-						for (Peer currPeer : client.peerList) {
-							currPeer.close();
-						}
-						tracker.sendEvent("stopped");
-						System.exit(1);
-					}
-				}
-			} catch (IOException e) {
-				System.out.print(e.getMessage());
-			}
-
-			file.close();
-			peer.close();
-		}
-*/
-
-	}
-	public void run() {
 
 	}
 
@@ -164,6 +133,9 @@ public class RUBTClient implements Runnable {
 		}
 	}
 
+	public synchronized void setDownloaded(int down) { 
+		this.downloaded += down;
+	}
 	private static class TrackerAnnounce extends TimerTask {
 
 		private final RUBTClient client;
@@ -286,6 +258,12 @@ public class RUBTClient implements Runnable {
 		}
 
 		return file_bytes;
+	}
+
+	@Override
+	public void run() {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

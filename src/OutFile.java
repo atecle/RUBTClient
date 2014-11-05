@@ -4,9 +4,13 @@ import java.io.RandomAccessFile;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-;
 
 
+/**
+ * 
+ *	Maintains state information about output file. computes client bitfield based on downloaded pieces
+ *
+ */
 public class OutFile {
 
 	public int sum = 0;
@@ -21,6 +25,7 @@ public class OutFile {
 
 	public Completed[] completed; 
 
+	//keep track of which pieces are in progress
 	public class Completed {
 		public boolean first;
 		public boolean second;
@@ -76,22 +81,20 @@ public class OutFile {
 
 	}
 
+	/**
+	 * Set associated client app to RUBTClient client
+	 * @param client
+	 */
 	public void setClient(RUBTClient client) {
 		this.client = client;
 	}
 
-
-	private void initializeBitField() {
-
-
-		for (int i = 0; i < client_bitfield.length; i++) {
-
-			for (int j = 1; j <= 8; j++) {
-				client_bitfield[i] &= ~(1  << j); 
-			}
-		}
-
-	}
+	
+	/**
+	 * adds first block of piece message to to Piece[] array. 
+	 * @param pMessage
+	 */
+	
 	public void addBlock(Message.PieceMessage pMessage) {
 
 
@@ -108,6 +111,11 @@ public class OutFile {
 
 	}
 
+	/**
+	 * Finds and returns piece index of the first piece peer has and client does not
+	 * @param peer_bitfield
+	 * @return index of first piece client does not have
+	 */
 	public int needPiece(byte[] peer_bitfield) {
 
 		//int piece_index = 0;
@@ -127,6 +135,11 @@ public class OutFile {
 		return -1;
 	}
 
+	/**
+	 * Called when Piece is already written to Piece[]. Writes piece data at piece_index to RAF
+	 * @param piece_index
+	 * @return true if piece hashes correctly and writes successfully
+	 */
 	public boolean write(int piece_index) {
 
 		if (!verifyPiece(pieces[piece_index].getData())) {
@@ -141,11 +154,12 @@ public class OutFile {
 
 			incomplete -= pieces[piece_index].getData().length;
 			updateBitfield();
-			if (incomplete <= 0 || piece_index == 435) {
-				//ready to seed
+			
+			if (incomplete <= 0 || piece_index == torrent.file_length% torrent.piece_length) {		// done downloading
+				client.tracker.update(client.uploaded, client.downloaded);
+				client.tracker.constructURL("completed");
+				client.tracker.sendEvent("completed");
 				close();
-				System.out.println("piece sum " + sum);
-				System.exit(1);
 			}
 
 
@@ -209,6 +223,17 @@ public class OutFile {
 		return false;
 	}
 
+	private void initializeBitField() {
+
+
+		for (int i = 0; i < client_bitfield.length; i++) {
+
+			for (int j = 1; j <= 8; j++) {
+				client_bitfield[i] &= ~(1  << j); 
+			}
+		}
+
+	}
 }
 
 
