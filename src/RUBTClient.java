@@ -115,20 +115,29 @@ public class RUBTClient implements Runnable {
 		RUBTClient client = new RUBTClient(tracker, output_file);
 
 		client.peerList = response.getValidPeers();
+		client.peer_queue = new ConcurrentLinkedQueue<Peer>();
+
 		Peer peer = client.peerList.get(0);
 		peer.setClient(client);
-		System.out.println("Connected " + peer.connectToPeer());
+		client.peer_queue.add(peer);
+		
+		peer = client.peerList.get(1);
+		peer.setClient(client);
+		
+		client.peer_queue.add(peer);
+		
+		
+	
 
 
 
 
 		client.outfile.setClient(client);
 
-		client.peer_queue = new ConcurrentLinkedQueue<Peer>();
-		client.peer_queue.add(peer);
+		
 
 		File file = new File(output_file);
-
+		
 		int complete = -1;
 		if (file.exists()) {
 			complete = client.outfile.loadState();
@@ -140,17 +149,32 @@ public class RUBTClient implements Runnable {
 		if (complete == 1) seeding = true;
 		
 		 (new Thread(new Listener(client))).start();
-
-		System.out.println(torrent.file_length%torrent.piece_length);
+		 (new Thread(new PeerListener(client))).start();
+		 
+		 System.out.println(torrent.file_length%torrent.piece_length);
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
-		peer.startThreads();
+		
+		while (true) {
+			Peer p = client.peer_queue.poll();
+			if (p == null) continue;
+			p.connectToPeer();
+			p.startThreads();
+		}
+		
+		
 
 
 	}
 
-	private class PeerListener implements Runnable {
+	private static class PeerListener implements Runnable {
+		
+		private RUBTClient client;
+		
+		public PeerListener(RUBTClient client) {
+			this.client = client;
+		}
 		public void run() {
 			int port = 6881;
 			while (true) {
@@ -175,7 +199,7 @@ public class RUBTClient implements Runnable {
 						}
 
 						System.arraycopy(response, 48, response_id, 0, 20);
-						for (Peer peer : peerList) {
+						for (Peer peer : client.peerList) {
 							boolean equal = true;
 							for (int i = 0; i < 20; i++) {
 								if (response_id[i] != peer.getPeerId().getBytes()[i])
@@ -195,9 +219,9 @@ public class RUBTClient implements Runnable {
 					}
 					if (validHandshake) {
 						Peer peer = new Peer(clientSocket.getInetAddress().toString(), new String(response_id, "UTF-8"), clientSocket.getPort());
-						peer.setClient(RUBTClient.this);
+						peer.setClient(client);
 						peer.startThreads();
-						peer_queue.add(peer);
+						client.peer_queue.add(peer);
 					}
 				} catch (SocketTimeoutException e) {
 					port++;
