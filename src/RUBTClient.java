@@ -3,6 +3,8 @@
 
 import java.io.*;
 import java.nio.*;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 
@@ -30,8 +33,9 @@ public class RUBTClient implements Runnable {
 
 
 	private static boolean keepRunning;
+	private static int HEADER_SIZE = 68;
 
-	public ArrayList<Peer> peer_list;
+	public Queue<Peer> peer_queue;
 
 	public String outputFile;
 	
@@ -39,6 +43,14 @@ public class RUBTClient implements Runnable {
 
 	public List<Peer> peerList;
 
+	public class Completed {
+		public boolean first;
+		public boolean second;
+		public Completed() {
+			this.first = false;
+			this.second = false;
+		}
+	}
 
 	private static Timer trackerTimer = new Timer("trackerTimer", true);
 	private static TrackerAnnounce announce;
@@ -82,7 +94,8 @@ public class RUBTClient implements Runnable {
 
 		RUBTClient client = new RUBTClient(tracker, output_file);
 
-		Peer peer = response.getValidPeers().get(0);
+		client.peerList = response.getValidPeers();
+		Peer peer = client.peerList.get(0);
 		peer.setClient(client);
 		System.out.println("Connected " + peer.connectToPeer());
 
@@ -91,14 +104,30 @@ public class RUBTClient implements Runnable {
 		
 		client.outfile.setClient(client);
 
-		client.peerList = new ArrayList<Peer>();
-		client.peerList.add(peer);
+		client.peer_queue = new ConcurrentLinkedQueue<Peer>();
+		client.peer_queue.add(peer);
 
 
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
 		peer.startThreads();
+
+		try {
+			BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+			String input;
+			while ((input = br.readLine()) != null) {
+				if (input.equals("quit")) {
+					for (Peer currPeer : client.peer_queue) {
+						currPeer.close();
+					}
+					tracker.sendEvent("stopped");
+					System.exit(1);
+				}
+			}
+		} catch (IOException e) {
+			System.out.print(e.getMessage());
+		}
 	
 		
 		
@@ -123,21 +152,6 @@ public class RUBTClient implements Runnable {
 		for ( i = 0; i < num_pieces; i++) {
 			file.write(peer.pieces[i].getData());
 
-			try {
-				BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-				String input;
-				while ((input = br.readLine()) != null) {
-					if (input.equals("quit")) {
-						for (Peer currPeer : client.peerList) {
-							currPeer.close();
-						}
-						tracker.sendEvent("stopped");
-						System.exit(1);
-					}
-				}
-			} catch (IOException e) {
-				System.out.print(e.getMessage());
-			}
 
 			file.close();
 			peer.close();
@@ -147,6 +161,77 @@ public class RUBTClient implements Runnable {
 	}
 	public void run() {
 
+	}
+
+	private class PeerListener implements Runnable {
+		private int port;
+
+		public PeerListener(int port) {
+			this.port = port;
+		}
+
+		public void run() {
+			while (true) {
+				try (
+					ServerSocket serverSocket = new ServerSocket(port);
+					Socket clientSocket = serverSocket.accept();
+					DataInputStream fromPeer = new DataInputStream(clientSocket.getInputStream());
+				) {
+					byte[] response_hash = new byte[20];
+					byte[] response_id = new byte[20];
+					byte[] response = new byte[HEADER_SIZE];
+					byte[] info_hash = tracker.getInfoHash().getBytes();
+
+					boolean validHandshake = true;
+
+					try {
+
+
+						fromPeer.read(response);
+						try {
+							System.out.println("Response: " + new String(response, "UTF-8"));
+						} catch (UnsupportedEncodingException e) {
+							System.out.println("Unsupported Encoding");
+						}
+
+
+						System.arraycopy(response, 28, response_hash, 0, 20);
+						for (int i = 0; i < 20; i++) {
+							if (response_hash[i] != info_hash[i]) {
+								System.out.println(Arrays.toString(response_hash));
+								validHandshake = false;
+							}
+						}
+
+						System.arraycopy(response, 48, response_id, 0, 20);
+						for (Peer peer : peerList) {
+							boolean equal = true;
+							for (int i = 0; i < 20; i++) {
+								if (response_id[i] != peer.getPeerId().getBytes()[i])
+									equal = false;
+							}
+							if (equal) {
+								validHandshake = validHandshake && equal;
+								break;
+							}
+						}
+					} catch(EOFException e) {
+						System.err.println("EOF Exception " + e.getMessage());
+						break;
+					} catch (IOException e) {
+						System.err.println("IOException " + e.getMessage());
+						break;
+					}
+					if (validHandshake) {
+						Peer peer = new Peer(clientSocket.getInetAddress().toString(), new String(response_id, "UTF-8"), clientSocket.getPort());
+						peer.setClient(RUBTClient.this);
+					}
+				} catch (IOException e) {
+					System.out.println("Caught IOException listening for new peers");
+					break;
+				}
+			}
+		}
 	}
 
 
