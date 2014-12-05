@@ -77,7 +77,7 @@ public class Peer {
 			while (true) {
 				Message message;
 				try {
-					System.out.println("Attempting decode");
+					//System.out.println("Attempting decode");
 					message = Message.decode(fromPeer, peerCompleted.length);
 					System.out.println("leaving decode");
 				} catch (EOFException e) {
@@ -149,7 +149,7 @@ public class Peer {
 						Message.RequestMessage rMessage = (Message.RequestMessage)message;
 						int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
 						byte[] data = new byte[rMessage.getLength()];
-						f.read(data, fileOffset, data.length);
+						client.outfile.read(data, fileOffset, data.length);
 						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
 						jobQueue.offer(piece);
 					} catch (IOException e) {
