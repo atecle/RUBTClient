@@ -48,6 +48,8 @@ public class RUBTClient implements Runnable {
 	public OutFile outfile;
 
 	public List<Peer> peerList;
+	
+	private int unchoked;
 
 	public class Completed {
 		public boolean first;
@@ -192,6 +194,8 @@ public class RUBTClient implements Runnable {
 
 
 						fromPeer.read(response);
+						System.out.println("GOT A MESSAGE HAHAHA");
+						System.exit(0);
 						try {
 							System.out.println("Response: " + new String(response, "UTF-8"));
 						} catch (UnsupportedEncodingException e) {
@@ -259,6 +263,7 @@ public class RUBTClient implements Runnable {
 	public synchronized void setDownloaded(int down) { 
 		this.downloaded += down;
 	}
+	
 	private static class TrackerAnnounce extends TimerTask {
 
 		private final RUBTClient client;
@@ -282,6 +287,20 @@ public class RUBTClient implements Runnable {
 
 			this.client.trackerTimer.schedule(new TrackerAnnounce(this.client), interval * 1000);
 
+		}
+	}
+	
+	private static class OptimisticChoke extends TimerTask {
+		
+		private final RUBTClient client;
+		
+		public OptimisticChoke(RUBTClient client) {
+			this.client = client;
+		}
+		
+		public void run() {
+			//have to find worst peer + choke, randomly unchoke another.
+			//need correct throughput measurement 
 		}
 	}
 
@@ -387,6 +406,14 @@ public class RUBTClient implements Runnable {
 	public void run() {
 		// TODO Auto-generated method stub
 
+	}
+	
+	public void incrementUnchoked() {
+		unchoked++;
+	}
+	
+	public void decrementUnchoked() {
+		unchoked--;
 	}
 
 }

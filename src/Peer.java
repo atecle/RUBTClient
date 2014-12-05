@@ -10,6 +10,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Queue;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -151,6 +152,7 @@ public class Peer {
 						byte[] data = new byte[rMessage.getLength()];
 						client.outfile.read(data, fileOffset, data.length);
 						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
+						uploaded+=piece.getLength();
 						jobQueue.offer(piece);
 					} catch (IOException e) {
 						System.out.println(e.getMessage());
@@ -163,6 +165,7 @@ public class Peer {
 					Message.PieceMessage pMessage = (Message.PieceMessage)message;
 					System.out.println("this piece " + pMessage.getPieceIndex() + " " + pMessage.getOffset() + " " + pMessage.getPieceLength());
 					client.outfile.completed[pMessage.getPieceIndex()].first = true;
+					downloaded+=pMessage.getLength();
 					requestNextPiece(pMessage);
 
 					break;
@@ -213,17 +216,17 @@ public class Peer {
 		int last_block_length = (client.tracker.getTorrentInfo().file_length%client.tracker.getTorrentInfo().piece_length)%max_length;
 		int piece = pMessage.getPieceIndex();
 		int offset = pMessage.getOffset();
-		
-	
+
+
 		if (piece == (client.tracker.getTorrentInfo().piece_hashes.length - 1)) {
 
 			if (last_block_length + offset == client.tracker.getTorrentInfo().file_length % client.tracker.getTorrentInfo().piece_length) {
 				if (client.outfile.write(piece)) {
 					downloaded += client.outfile.pieces[piece].getData().length;
-					
-					
+
+
 					jobQueue.offer(new Message.HaveMessage(piece));
-					
+
 					return;
 				} else {
 					System.out.println("SHA FAILED"); System.exit(1); 
@@ -236,20 +239,20 @@ public class Peer {
 				System.out.println("SHA SUCCESS");
 				downloaded += client.outfile.pieces[piece].getData().length;
 				jobQueue.offer(new Message.HaveMessage(piece));
-				
+
 				Message.RequestMessage m = formRequest();
 				jobQueue.offer(m);
 				System.out.println("just sent request for piece " + m.getIndex());
-				
+
 			} else {
 				System.out.println("SHA FAILED");
 			}
 		} else {
-			
+
 			jobQueue.offer(new Message.RequestMessage(piece, max_length + offset, max_length));
 		}
-		
-		
+
+
 
 	}
 	private Message.RequestMessage formRequest() {
@@ -258,7 +261,7 @@ public class Peer {
 		int offset = 0;
 
 		if ((piece = client.outfile.needPiece(bitfield)) == -1) { 
-		
+
 			interested = false;
 			return null;
 		}
@@ -271,9 +274,9 @@ public class Peer {
 		return (new Message.RequestMessage(piece, offset, max_length));
 	}
 	public void startThreads() {
-		
+
 		this.jobQueue = new ConcurrentLinkedQueue<Message>();
-		
+
 		doHandshake();
 
 		if (!checkHandshake(client.tracker.getTorrentInfo().info_hash.array())) {
@@ -282,7 +285,7 @@ public class Peer {
 			client.peerList.remove(this);
 			return;
 		}
-		 
+
 		//jobQueue.offer(new Message.BitFieldMessage(this.client.outfile.client_bitfield));
 		this.producer = new Thread(this.new Producer());
 		this.consumer = new Thread(this.new Consumer());
@@ -439,6 +442,15 @@ public class Peer {
 	}
 
 
+	private static class PerformanceTimer extends TimerTask{
+		private Peer peer;
+		public PerformanceTimer(Peer peer){
+			this.peer = peer;
+		}
+		public void run(){
+
+		}
+	}
 
 	public Message listen() {
 
