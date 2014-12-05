@@ -48,6 +48,7 @@ public class RUBTClient implements Runnable {
 	public OutFile outfile;
 
 	public List<Peer> peerList;
+	public List<Peer> chokedPeers;
 	
 	private int unchoked;
 
@@ -194,8 +195,7 @@ public class RUBTClient implements Runnable {
 
 
 						fromPeer.read(response);
-						System.out.println("GOT A MESSAGE HAHAHA");
-						System.exit(0);
+						
 						try {
 							System.out.println("Response: " + new String(response, "UTF-8"));
 						} catch (UnsupportedEncodingException e) {
