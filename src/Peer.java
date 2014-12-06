@@ -30,8 +30,8 @@ public class Peer {
 	private static int HEADER_SIZE = 68;
 	private static String PROTOCOL = "BitTorrent protocol";
 
-	private boolean choked;
-	private boolean choking_peer;
+	private boolean choked;				//true when peer is choking client
+	private boolean choking_peer;		// true when client is choking peer
 	private boolean connected;
 	private boolean interested;
 	private boolean peer_interested;
@@ -40,6 +40,8 @@ public class Peer {
 
 	private int downloaded;
 	private int uploaded;
+	private int last_downloaded;
+	private int last_uploaded;
 
 	public static final int max_length = 16384;
 
@@ -78,7 +80,7 @@ public class Peer {
 			while (true) {
 				Message message;
 				try {
-					//System.out.println("Attempting decode");
+					System.out.println("Attempting decode");
 					message = Message.decode(fromPeer, peerCompleted.length);
 					System.out.println("leaving decode");
 				} catch (EOFException e) {
@@ -117,6 +119,8 @@ public class Peer {
 						choking_peer = false;
 						jobQueue.offer(Message.UNCHOKE);
 						client.incrementUnchoked();
+					} else {
+						client.interested_peers.add(Peer.this);
 					}
 					break;
 				case Message.UNINTERESTED_ID:
@@ -164,13 +168,14 @@ public class Peer {
 						client.outfile.read(data, fileOffset, data.length);
 						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
 						uploaded+=piece.getLength();
+						last_uploaded = piece.getLength();
 						jobQueue.offer(piece);
 					} catch (IOException e) {
 						System.out.println(e.getMessage());
 					}
 					break;
 				case Message.PIECE_ID:
-					
+
 
 					if (!interested) {
 						close();
@@ -182,6 +187,7 @@ public class Peer {
 					System.out.println("this piece " + pMessage.getPieceIndex() + " " + pMessage.getOffset() + " " + pMessage.getPieceLength());
 					client.outfile.completed[pMessage.getPieceIndex()].first = true;
 					downloaded+=pMessage.getLength();
+					last_downloaded += pMessage.getLength();
 					requestNextPiece(pMessage);
 
 					break;
@@ -294,10 +300,10 @@ public class Peer {
 
 
 	public void startThreads() {
-
 		this.jobQueue = new ConcurrentLinkedQueue<Message>();
 
 		doHandshake();
+
 
 		if (!checkHandshake(client.tracker.getTorrentInfo().info_hash.array())) {
 			System.out.println("handshake failed");
@@ -306,7 +312,9 @@ public class Peer {
 			return;
 		}
 
-		//jobQueue.offer(new Message.BitFieldMessage(this.client.outfile.client_bitfield));
+
+
+		jobQueue.offer(new Message.BitFieldMessage(this.client.outfile.client_bitfield));
 		this.producer = new Thread(this.new Producer());
 		this.consumer = new Thread(this.new Consumer());
 		this.producer.start();
@@ -335,9 +343,16 @@ public class Peer {
 		this.choking_peer = true;
 		this.connected = false;
 		this.interested = false;
+		this.peer_interested = false;
 		this.first_sent = false;
 		this.stopProducing = false;
+		this.uploaded = 0;
+		this.downloaded = 0;
+		this.last_uploaded = 0;
+		this.last_downloaded = 0;
+		
 	}
+	
 
 	public void setClient(RUBTClient client) {
 
@@ -374,12 +389,53 @@ public class Peer {
 		return port;
 	}
 
-	public void unchokeMe() {
-		choked = false;
+	/**
+	 * returns true if client is choking this peer
+	 */
+	public boolean isChoked() {
+		return choking_peer;
+	}
+	
+	
+	/**
+	 * returns true if peer is choking client.
+	 */
+	public boolean isChoking() {
+		return choked;
 	}
 
+	public void setChoked(boolean b) {
+		choked = b;
+	}
+	
+	public void setChoking(boolean b) {
+		choking_peer = b;
+	}
 
+	public int getDownloaded() {
+		return downloaded;
+	}
+	
+	public int getUploaded() {
+		return uploaded;
+	}
 
+	public int getLastUploaded() {
+		return last_uploaded;
+	}
+	
+	public int getLastDownloaded() {
+		return last_downloaded;
+	}
+	
+	public void setLastUploaded(int x) {
+		last_uploaded = x;
+	}
+	
+	public void setLastDownloaded(int x) {
+		last_downloaded = x;
+	}
+	
 	public boolean listenForUnchoke() {
 
 		try {
@@ -425,11 +481,11 @@ public class Peer {
 			if (fromPeer != null) fromPeer.close();
 
 			connected = false;
-			
+
 			if (client.peerList.contains(this)) {
 				client.peerList.remove(this);
 			}
-			
+
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -478,15 +534,6 @@ public class Peer {
 	}
 
 
-	private static class PerformanceTimer extends TimerTask{
-		private Peer peer;
-		public PerformanceTimer(Peer peer){
-			this.peer = peer;
-		}
-		public void run(){
-
-		}
-	}
 
 	public Message listen() {
 

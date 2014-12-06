@@ -48,7 +48,7 @@ public class RUBTClient implements Runnable {
 	public OutFile outfile;
 
 	public List<Peer> peerList;
-	public List<Peer> chokedPeers;
+	public List<Peer> interested_peers;
 
 	
 	private int unchoked;
@@ -122,14 +122,16 @@ public class RUBTClient implements Runnable {
 		client.peerList = response.getValidPeers();
 		client.peer_queue = new ConcurrentLinkedQueue<Peer>();
 
+		
+		
 		Peer peer = client.peerList.get(0);
 		peer.setClient(client);
 		client.peer_queue.add(peer);
 		
-		peer = client.peerList.get(1);
-		peer.setClient(client);
 		
-		client.peer_queue.add(peer);
+		//peer = client.peerList.get(1);
+		//peer.setClient(client);
+		//client.peer_queue.add(peer);
 		
 
 
@@ -297,8 +299,54 @@ public class RUBTClient implements Runnable {
 		}
 		
 		public void run() {
-			//have to find worst peer + choke, randomly unchoke another.
-			//need correct throughput measurement 
+			
+			double rand = Math.random() * 3;
+			Math.round(rand);
+			
+			int total = 0;
+			int max = Integer.MIN_VALUE;
+			int max_index = -1;
+			int min = Integer.MAX_VALUE;
+			int min_index = -1;
+			System.out.println("====== Optimistic Choke Task Beginning ======");
+			for (int i = 0; i < client.peerList.size(); i++) {
+				Peer peer = client.peerList.get(i);
+				if (!peer.isChoked()) {
+					total = peer.getLastUploaded() + peer.getLastDownloaded(); 
+					peer.setLastDownloaded(0);
+					peer.setLastUploaded(0);
+					min_index = total < min ? i : min_index;
+				}
+			}
+			
+			for (int i = 0; i < client.interested_peers.size(); i++) {
+				Peer peer = client.interested_peers.get(i);
+				total = peer.getLastDownloaded() + peer.getLastUploaded();
+				peer.setLastUploaded(0);
+				peer.setLastDownloaded(0);
+				max_index = total > max ? i : max_index;
+			}
+			
+			Peer add_peer;
+			Peer drop_peer;
+			
+			add_peer = max_index != -1 ? client.interested_peers.get(max_index) : null;
+			drop_peer = min_index != -1 ? client.interested_peers.get(min_index) : null;
+			
+			if (add_peer == null || drop_peer == null) {
+				return;
+			} else {
+				System.out.println("Unchoking peer " + add_peer.getPeerId());
+				add_peer.addJob(Message.UNCHOKE);
+				add_peer.setChoked(false);
+				client.interested_peers.remove(add_peer);
+				
+				System.out.println("Choking peer " + drop_peer.getPeerId());
+				drop_peer.addJob(Message.CHOKE);
+				drop_peer.setChoked(true);
+			}
+			
+			System.out.println("====== Optimistic Choke Task Ending ========");
 		}
 	}
 
