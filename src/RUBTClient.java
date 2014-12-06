@@ -49,8 +49,10 @@ public class RUBTClient implements Runnable {
 
 	public List<Peer> peerList;
 	public List<Peer> chokedPeers;
+
 	
 	private int unchoked;
+	public final int unchoked_limit = 3;
 
 	public class Completed {
 		public boolean first;
@@ -129,10 +131,6 @@ public class RUBTClient implements Runnable {
 		
 		client.peer_queue.add(peer);
 		
-		
-	
-
-
 
 
 		client.outfile.setClient(client);
@@ -154,7 +152,7 @@ public class RUBTClient implements Runnable {
 		 (new Thread(new Listener(client))).start();
 		 (new Thread(new PeerListener(client))).start();
 		 
-		 System.out.println(torrent.file_length%torrent.piece_length);
+		System.out.println(torrent.file_length%torrent.piece_length);
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
@@ -195,7 +193,7 @@ public class RUBTClient implements Runnable {
 
 
 						fromPeer.read(response);
-						
+
 						try {
 							System.out.println("Response: " + new String(response, "UTF-8"));
 						} catch (UnsupportedEncodingException e) {
@@ -414,6 +412,10 @@ public class RUBTClient implements Runnable {
 	
 	public void decrementUnchoked() {
 		unchoked--;
+	}
+	
+	public int getUnchoked() {
+		return unchoked;
 	}
 
 }
