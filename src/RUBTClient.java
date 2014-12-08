@@ -94,7 +94,7 @@ public class RUBTClient implements Runnable {
 		outfile = new OutFile(tracker.getTorrentInfo());
 		keepRunning = true;
 		seeding = false;
-		totalCompleted = new ArrayList<>();
+		totalCompleted = new ArrayList<CompleteIndex>();
 		for (int i = 0; i < outfile.completed.length; i++) {
 			totalCompleted.add(new CompleteIndex(i, 0));
 		}

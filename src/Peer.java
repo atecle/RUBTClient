@@ -153,7 +153,7 @@ public class Peer {
 
 					if (client.outfile.needPiece(bitfield) != -1) {
 						interested = true;
-
+						System.out.println("About to send interested message");
 						jobQueue.offer(Message.INTERESTED);
 					}
 					break;
