@@ -218,7 +218,7 @@ public class Peer {
 						break;
 					}
 					synchronized (lock) {
-						while (message.getID() != Message.INTERESTED_ID && choked) {
+						while (message.getID() != Message.INTERESTED_ID && message.getID() != Message.BITFIELD_ID && choked) {
 							System.out.println("Started waiting");
 							try { lock.wait(); } catch (InterruptedException e) {
 								System.out.println("INTERRUPTED");
