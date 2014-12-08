@@ -113,11 +113,10 @@ public class Message {
 	 */
 	public static Message decode(final InputStream in, final int bitlen) throws EOFException, IOException {
 
-		System.out.println("start");
 		DataInputStream fromPeer = new DataInputStream(in);
+
 		
 		int length = fromPeer.readInt();
-		
 		
 		System.out.println("Message length in decode: " + length);
 

@@ -212,10 +212,6 @@ public class OutFile {
 		return false;
 	}
 
-    public int read(byte[] b, int off, int len) throws IOException {
-		return file.read(b, off, len);
-    }
-
 
 	public void close() {
 

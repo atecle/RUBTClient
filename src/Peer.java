@@ -10,7 +10,6 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Queue;
-import java.util.TimerTask;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -30,8 +29,8 @@ public class Peer {
 	private static int HEADER_SIZE = 68;
 	private static String PROTOCOL = "BitTorrent protocol";
 
-	private boolean choked;				//true when peer is choking client
-	private boolean choking_peer;		// true when client is choking peer
+	private boolean choked;
+	private boolean peer_choking;
 	private boolean connected;
 	private boolean interested;
 	private boolean peer_interested;
@@ -91,14 +90,14 @@ public class Peer {
 				}
 				switch (message.getID()) {
 				case Message.KEEP_ALIVE_ID:
-					System.out.println("Got keepalive message from " + getPeerId());
+					System.out.println("Got keepalive message");
 					break;
 				case Message.CHOKE_ID:
-					System.out.println("Got choke message from " + getPeerId());
+					System.out.println("Got choke message");
 					choked = true;
 					break;
 				case Message.UNCHOKE_ID:
-					System.out.println("Got unchoke message from " + getPeerId());
+					System.out.println("Got unchoke message");
 					synchronized (lock) {
 						choked = false;
 						lock.notifyAll();
@@ -113,29 +112,22 @@ public class Peer {
 
 					break;
 				case Message.INTERESTED_ID:
-					System.out.println("Got interested message from " + getPeerId());
-					peer_interested = true;
-					if (client.getUnchoked() < client.unchoked_limit) {
-						choking_peer = false;
-						jobQueue.offer(Message.UNCHOKE);
-						client.incrementUnchoked();
-					} else {
-						client.interested_peers.add(Peer.this);
-					}
+					System.out.println("Got interested message");
+					interested = true;
+					jobQueue.offer(Message.UNCHOKE);
 					break;
 				case Message.UNINTERESTED_ID:
-					System.out.println("Got uninterested message from " + getPeerId());
+					System.out.println("Got uninterested message");
 					interested = false;
 					jobQueue.offer(Message.CHOKE);
 					break;
 				case Message.HAVE_ID:
-					System.out.println("Got have message from " + getPeerId());
+					System.out.println("Got have message");
 					Message.HaveMessage hMessage = (Message.HaveMessage)message;
 					peerCompleted[hMessage.getPieceIndex()] = true;
-					client.have(hMessage.getPieceIndex());
 					break;
 				case Message.BITFIELD_ID:
-					System.out.println("Got bitfield message from " + getPeerId());
+					System.out.println("Got bitfield message");
 
 					if (!firstSent()) {
 						setFirstSent(true);
@@ -146,55 +138,37 @@ public class Peer {
 					Message.BitFieldMessage bMessage = (Message.BitFieldMessage)message;
 					bitfield = bMessage.getData();
 					peerCompleted = bMessage.getCompleted();
-					for (int i = 0; i <peerCompleted.length; i++) {
-						if (peerCompleted[i])
-							client.have(i);
-					}
 
 					if (client.outfile.needPiece(bitfield) != -1) {
 						interested = true;
-						System.out.println("About to send interested message");
+
 						jobQueue.offer(Message.INTERESTED);
-					} else {
-						System.out.println("Piece not needed");
 					}
 					break;
 				case Message.REQUEST_ID:
 					try {
-						System.out.println("Got request message from " + getPeerId());
+						System.out.println("Got request message");
 						Message.RequestMessage rMessage = (Message.RequestMessage)message;
-						if (!validRequest(rMessage)) {
-							if (!choking_peer) {
-								System.out.println("Removing peer " + getPeerId());
-								close();
-								return;
-							}
-						}
 						int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
 						byte[] data = new byte[rMessage.getLength()];
-						client.outfile.read(data, fileOffset, data.length);
+						f.read(data, fileOffset, data.length);
 						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
 						uploaded+=piece.getLength();
-						last_uploaded = piece.getLength();
+						setLastUploaded(piece.getLength());
 						jobQueue.offer(piece);
 					} catch (IOException e) {
 						System.out.println(e.getMessage());
 					}
 					break;
 				case Message.PIECE_ID:
-
-
-					if (!interested) {
-						close();
-						return;
-					}
-					System.out.println("Got piece message from " + getPeerId());
+					//	try {
+					System.out.println("Got piece message");
 
 					Message.PieceMessage pMessage = (Message.PieceMessage)message;
 					System.out.println("this piece " + pMessage.getPieceIndex() + " " + pMessage.getOffset() + " " + pMessage.getPieceLength());
 					client.outfile.completed[pMessage.getPieceIndex()].first = true;
 					downloaded+=pMessage.getLength();
-					last_downloaded += pMessage.getLength();
+					setLastDownloaded(pMessage.getLength());
 					requestNextPiece(pMessage);
 
 					break;
@@ -245,18 +219,17 @@ public class Peer {
 		int last_block_length = (client.tracker.getTorrentInfo().file_length%client.tracker.getTorrentInfo().piece_length)%max_length;
 		int piece = pMessage.getPieceIndex();
 		int offset = pMessage.getOffset();
-
-
+		
+	
 		if (piece == (client.tracker.getTorrentInfo().piece_hashes.length - 1)) {
 
 			if (last_block_length + offset == client.tracker.getTorrentInfo().file_length % client.tracker.getTorrentInfo().piece_length) {
 				if (client.outfile.write(piece)) {
 					downloaded += client.outfile.pieces[piece].getData().length;
-
-
+					
+					
 					jobQueue.offer(new Message.HaveMessage(piece));
-					client.completed(piece);
-
+					
 					return;
 				} else {
 					System.out.println("SHA FAILED"); System.exit(1); 
@@ -269,32 +242,29 @@ public class Peer {
 				System.out.println("SHA SUCCESS");
 				downloaded += client.outfile.pieces[piece].getData().length;
 				jobQueue.offer(new Message.HaveMessage(piece));
-				client.completed(piece);
-
+				
 				Message.RequestMessage m = formRequest();
 				jobQueue.offer(m);
 				System.out.println("just sent request for piece " + m.getIndex());
-
+				
 			} else {
 				System.out.println("SHA FAILED");
 			}
 		} else {
-
+			
 			jobQueue.offer(new Message.RequestMessage(piece, max_length + offset, max_length));
 		}
-
-
+		
+		
 
 	}
-
-
 	private Message.RequestMessage formRequest() {
 
 		int piece;
 		int offset = 0;
 
-		if ((piece = client.getRandomRarest(peerCompleted)) == -1) { 
-
+		if ((piece = client.outfile.needPiece(bitfield)) == -1) { 
+		
 			interested = false;
 			return null;
 		}
@@ -306,13 +276,11 @@ public class Peer {
 		System.out.println("forming request for piece " + piece);
 		return (new Message.RequestMessage(piece, offset, max_length));
 	}
-
-
 	public void startThreads() {
+		
 		this.jobQueue = new ConcurrentLinkedQueue<Message>();
-
+		
 		doHandshake();
-
 
 		if (!checkHandshake(client.tracker.getTorrentInfo().info_hash.array())) {
 			System.out.println("handshake failed");
@@ -320,10 +288,8 @@ public class Peer {
 			client.peerList.remove(this);
 			return;
 		}
-
-
-
-		jobQueue.offer(new Message.BitFieldMessage(this.client.outfile.client_bitfield));
+		 
+		//jobQueue.offer(new Message.BitFieldMessage(this.client.outfile.client_bitfield));
 		this.producer = new Thread(this.new Producer());
 		this.consumer = new Thread(this.new Consumer());
 		this.producer.start();
@@ -349,19 +315,12 @@ public class Peer {
 		this.peer_id = peer_id;
 		this.port = port;
 		this.choked = true;
-		this.choking_peer = true;
+		this.peer_choking = true;
 		this.connected = false;
 		this.interested = false;
-		this.peer_interested = false;
 		this.first_sent = false;
 		this.stopProducing = false;
-		this.uploaded = 0;
-		this.downloaded = 0;
-		this.last_uploaded = 0;
-		this.last_downloaded = 0;
-		
 	}
-	
 
 	public void setClient(RUBTClient client) {
 
@@ -398,53 +357,34 @@ public class Peer {
 		return port;
 	}
 
-	/**
-	 * returns true if client is choking this peer
-	 */
-	public boolean isChoked() {
-		return choking_peer;
+	public void unchokeMe() {
+		choked = false;
 	}
 	
-	
-	/**
-	 * returns true if peer is choking client.
-	 */
-	public boolean isChoking() {
+	public boolean isChoked() {
 		return choked;
 	}
-
-	public void setChoked(boolean b) {
-		choked = b;
-	}
 	
-	public void setChoking(boolean b) {
-		choking_peer = b;
-	}
-
-	public int getDownloaded() {
-		return downloaded;
-	}
-	
-	public int getUploaded() {
-		return uploaded;
-	}
-
 	public int getLastUploaded() {
 		return last_uploaded;
+	}
+	
+	public void setLastUploaded( int x ) {
+		last_uploaded = x;
 	}
 	
 	public int getLastDownloaded() {
 		return last_downloaded;
 	}
-	
-	public void setLastUploaded(int x) {
-		last_uploaded = x;
-	}
-	
+
 	public void setLastDownloaded(int x) {
 		last_downloaded = x;
 	}
-	
+
+	public void setChoked( boolean b) {
+		choked = b;
+	}
+
 	public boolean listenForUnchoke() {
 
 		try {
@@ -491,10 +431,6 @@ public class Peer {
 
 			connected = false;
 
-			if (client.peerList.contains(this)) {
-				client.peerList.remove(this);
-			}
-
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -528,18 +464,6 @@ public class Peer {
 
 		sendMessage(Message.uninterested);
 
-	}
-
-	private boolean validRequest(Message.RequestMessage msg) {
-
-		if((msg.getBlockLength() > max_length || msg.getBlockLength() <= 0) 
-				|| (msg.getIndex() > client.tracker.getTorrentInfo().piece_hashes.length|| msg.getIndex() < 0)
-				|| (msg.getOffset() < 0 || msg.getOffset() > client.tracker.getTorrentInfo().piece_length)) {
-			//checks if any of the fields in the request method are invalid
-			return false;
-		}
-
-		return true;
 	}
 
 
