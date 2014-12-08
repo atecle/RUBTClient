@@ -169,7 +169,7 @@ public class Peer {
 						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
 						uploaded+=piece.getLength();
 						setLastUploaded(piece.getLength());
-						//jobQueue.offer(piece);
+						jobQueue.offer(piece);
 					} catch (IOException e) {
 						System.out.println(e.getMessage());
 					}
