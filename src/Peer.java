@@ -125,6 +125,7 @@ public class Peer {
 					System.out.println("Got have message");
 					Message.HaveMessage hMessage = (Message.HaveMessage)message;
 					peerCompleted[hMessage.getPieceIndex()] = true;
+					client.have(hMessage.getPieceIndex());
 					break;
 				case Message.BITFIELD_ID:
 					System.out.println("Got bitfield message");
@@ -138,6 +139,12 @@ public class Peer {
 					Message.BitFieldMessage bMessage = (Message.BitFieldMessage)message;
 					bitfield = bMessage.getData();
 					peerCompleted = bMessage.getCompleted();
+					for (int i = 0; i <peerCompleted.length; i++) {
+						if (peerCompleted[i])
+							client.have(i);
+						else
+							System.out.println("Peer did not complete " + i);
+					}
 
 					if (client.outfile.needPiece(bitfield) != -1) {
 						interested = true;
@@ -155,7 +162,7 @@ public class Peer {
 						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
 						uploaded+=piece.getLength();
 						setLastUploaded(piece.getLength());
-						jobQueue.offer(piece);
+						//jobQueue.offer(piece);
 					} catch (IOException e) {
 						System.out.println(e.getMessage());
 					}
@@ -229,7 +236,8 @@ public class Peer {
 					
 					
 					jobQueue.offer(new Message.HaveMessage(piece));
-					
+					client.completed(piece);
+
 					return;
 				} else {
 					System.out.println("SHA FAILED"); System.exit(1); 
@@ -242,7 +250,8 @@ public class Peer {
 				System.out.println("SHA SUCCESS");
 				downloaded += client.outfile.pieces[piece].getData().length;
 				jobQueue.offer(new Message.HaveMessage(piece));
-				
+				client.completed(piece);
+
 				Message.RequestMessage m = formRequest();
 				jobQueue.offer(m);
 				System.out.println("just sent request for piece " + m.getIndex());
@@ -263,8 +272,8 @@ public class Peer {
 		int piece;
 		int offset = 0;
 
-		if ((piece = client.outfile.needPiece(bitfield)) == -1) { 
-		
+		if ((piece = client.getRandomRarest(peerCompleted)) == -1) { 
+			System.out.println("FUCK");
 			interested = false;
 			return null;
 		}
