@@ -155,6 +155,8 @@ public class Peer {
 						interested = true;
 						System.out.println("About to send interested message");
 						jobQueue.offer(Message.INTERESTED);
+					} else {
+						System.out.println("Piece not needed");
 					}
 					break;
 				case Message.REQUEST_ID:
