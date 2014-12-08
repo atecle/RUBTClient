@@ -48,7 +48,9 @@ public class RUBTClient implements Runnable {
 	public OutFile outfile;
 
 	public List<Peer> peerList;
-	public List<Peer> interested_peers;
+	public List<Peer> want_unchoke;
+	public final int unchoke_limit = 3;
+	private static int unchoked_peers;
 
 	public class Completed {
 		public boolean first;
@@ -63,6 +65,8 @@ public class RUBTClient implements Runnable {
 
 	private static Timer trackerTimer = new Timer("trackerTimer", true);
 	private static TrackerAnnounce announce;
+	private static Timer optimisticTimer = new Timer("optimisticTimer", true);
+	private static OptimisticChoke optimistic_choke;
 
 	/**
 	 * Constructor for RUBTClient obj
@@ -77,6 +81,7 @@ public class RUBTClient implements Runnable {
 		outfile = new OutFile(tracker.getTorrentInfo());
 		keepRunning = true;
 		seeding = false;
+		unchoked_peers = 0;
 	}
 
 	/**
@@ -117,6 +122,7 @@ public class RUBTClient implements Runnable {
 
 		client.peerList = response.getValidPeers();
 		client.peer_queue = new ConcurrentLinkedQueue<Peer>();
+		client.want_unchoke = new ArrayList<Peer>();
 
 		Peer peer = client.peerList.get(0);
 		peer.setClient(client);
@@ -156,6 +162,8 @@ public class RUBTClient implements Runnable {
 		System.out.println(response.interval());
 		announce = new TrackerAnnounce(client);
 		trackerTimer.schedule(announce, response.interval() * 1000 );
+		optimistic_choke = new OptimisticChoke(client);
+		optimisticTimer.schedule(optimistic_choke, 30 * 1000);
 		
 		while (true) {
 			Peer p = client.peer_queue.poll();
@@ -305,6 +313,7 @@ private static class OptimisticChoke extends TimerTask {
 			int min = Integer.MAX_VALUE;
 			int min_index = -1;
 			System.out.println("====== Optimistic Choke Task Beginning ======");
+		
 			for (int i = 0; i < client.peerList.size(); i++) {
 				Peer peer = client.peerList.get(i);
 				if (!peer.isChoked()) {
@@ -315,8 +324,8 @@ private static class OptimisticChoke extends TimerTask {
 				}
 			}
 			
-			for (int i = 0; i < client.interested_peers.size(); i++) {
-				Peer peer = client.interested_peers.get(i);
+			for (int i = 0; i < client.want_unchoke.size(); i++) {
+				Peer peer = client.want_unchoke.get(i);
 				total = peer.getLastDownloaded() + peer.getLastUploaded();
 				peer.setLastUploaded(0);
 				peer.setLastDownloaded(0);
@@ -326,16 +335,18 @@ private static class OptimisticChoke extends TimerTask {
 			Peer add_peer;
 			Peer drop_peer;
 			
-			add_peer = max_index != -1 ? client.interested_peers.get(max_index) : null;
-			drop_peer = min_index != -1 ? client.interested_peers.get(min_index) : null;
+			add_peer = max_index != -1 ? client.want_unchoke.get(max_index) : null;
+			drop_peer = min_index != -1 ? client.peerList.get(min_index) : null;
 			
 			if (add_peer == null || drop_peer == null) {
+				System.out.println("xxxxxxxxx  Optimistic Choke Task Incomplete xxxxxxxx");
 				return;
 			} else {
 				System.out.println("Unchoking peer " + add_peer.getPeerId());
 				add_peer.addJob(Message.UNCHOKE);
 				add_peer.setChoked(false);
-				client.interested_peers.remove(add_peer);
+				client.want_unchoke.remove(add_peer);
+	
 				
 				System.out.println("Choking peer " + drop_peer.getPeerId());
 				drop_peer.addJob(Message.CHOKE);
@@ -343,10 +354,24 @@ private static class OptimisticChoke extends TimerTask {
 			}
 			
 			System.out.println("====== Optimistic Choke Task Ending ========");
+			this.client.optimisticTimer.schedule(new OptimisticChoke(this.client), 30 * 1000);
+			
 		}
 	}
 
+	public synchronized static void incrementUnchoked() {
+		unchoked_peers++;
+	}
 
+	public synchronized void decrementUnchoked() {
+		unchoked_peers--;
+	}
+	
+	public int getUnchoked() {
+		return unchoked_peers;
+	}
+	
+	
 	/**
 	 * 
 	 * @param file_name 

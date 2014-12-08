@@ -30,7 +30,7 @@ public class Peer {
 	private static String PROTOCOL = "BitTorrent protocol";
 
 	private boolean choked;
-	private boolean peer_choking;
+	private boolean peer_choked;
 	private boolean connected;
 	private boolean interested;
 	private boolean peer_interested;
@@ -90,14 +90,14 @@ public class Peer {
 				}
 				switch (message.getID()) {
 				case Message.KEEP_ALIVE_ID:
-					System.out.println("Got keepalive message");
+					System.out.println("Got keepalive message from peer " + getPeerId());
 					break;
 				case Message.CHOKE_ID:
-					System.out.println("Got choke message");
+					System.out.println("Got choke message from peer " + getPeerId());
 					choked = true;
 					break;
 				case Message.UNCHOKE_ID:
-					System.out.println("Got unchoke message");
+					System.out.println("Got unchoke message from peer " + getPeerId());
 					synchronized (lock) {
 						choked = false;
 						lock.notifyAll();
@@ -112,22 +112,29 @@ public class Peer {
 
 					break;
 				case Message.INTERESTED_ID:
-					System.out.println("Got interested message");
+					System.out.println("Got interested message from peer " + getPeerId());
 					interested = true;
-					jobQueue.offer(Message.UNCHOKE);
+					if (client.getUnchoked() < client.unchoke_limit) {
+						jobQueue.offer(Message.UNCHOKE);
+						peer_choked = false;
+						client.incrementUnchoked();
+						client.want_unchoke.add(Peer.this);
+					}
 					break;
 				case Message.UNINTERESTED_ID:
-					System.out.println("Got uninterested message");
+					System.out.println("Got uninterested message from peer " + getPeerId());
 					interested = false;
 					jobQueue.offer(Message.CHOKE);
+					client.want_unchoke.remove(Peer.this);
+					client.decrementUnchoked();
 					break;
 				case Message.HAVE_ID:
-					System.out.println("Got have message");
+					System.out.println("Got have message from peer " + getPeerId());
 					Message.HaveMessage hMessage = (Message.HaveMessage)message;
 					peerCompleted[hMessage.getPieceIndex()] = true;
 					break;
 				case Message.BITFIELD_ID:
-					System.out.println("Got bitfield message");
+					System.out.println("Got bitfield message from peer " + getPeerId());
 
 					if (!firstSent()) {
 						setFirstSent(true);
@@ -138,16 +145,16 @@ public class Peer {
 					Message.BitFieldMessage bMessage = (Message.BitFieldMessage)message;
 					bitfield = bMessage.getData();
 					peerCompleted = bMessage.getCompleted();
-
+					
 					if (client.outfile.needPiece(bitfield) != -1) {
 						interested = true;
-
+						peer_choked = false;
 						jobQueue.offer(Message.INTERESTED);
 					}
 					break;
 				case Message.REQUEST_ID:
 					try {
-						System.out.println("Got request message");
+						System.out.println("Got request message from peer " + getPeerId());
 						Message.RequestMessage rMessage = (Message.RequestMessage)message;
 						int fileOffset = rMessage.getIndex() * client.tracker.getTorrentInfo().piece_length + rMessage.getOffset();
 						byte[] data = new byte[rMessage.getLength()];
@@ -162,7 +169,7 @@ public class Peer {
 					break;
 				case Message.PIECE_ID:
 					//	try {
-					System.out.println("Got piece message");
+					System.out.println("Got piece message from peer " + getPeerId());
 
 					Message.PieceMessage pMessage = (Message.PieceMessage)message;
 					System.out.println("this piece " + pMessage.getPieceIndex() + " " + pMessage.getOffset() + " " + pMessage.getPieceLength());
@@ -219,17 +226,17 @@ public class Peer {
 		int last_block_length = (client.tracker.getTorrentInfo().file_length%client.tracker.getTorrentInfo().piece_length)%max_length;
 		int piece = pMessage.getPieceIndex();
 		int offset = pMessage.getOffset();
-		
-	
+
+
 		if (piece == (client.tracker.getTorrentInfo().piece_hashes.length - 1)) {
 
 			if (last_block_length + offset == client.tracker.getTorrentInfo().file_length % client.tracker.getTorrentInfo().piece_length) {
 				if (client.outfile.write(piece)) {
 					downloaded += client.outfile.pieces[piece].getData().length;
-					
-					
+
+
 					jobQueue.offer(new Message.HaveMessage(piece));
-					
+
 					return;
 				} else {
 					System.out.println("SHA FAILED"); System.exit(1); 
@@ -242,20 +249,20 @@ public class Peer {
 				System.out.println("SHA SUCCESS");
 				downloaded += client.outfile.pieces[piece].getData().length;
 				jobQueue.offer(new Message.HaveMessage(piece));
-				
+
 				Message.RequestMessage m = formRequest();
 				jobQueue.offer(m);
 				System.out.println("just sent request for piece " + m.getIndex());
-				
+
 			} else {
 				System.out.println("SHA FAILED");
 			}
 		} else {
-			
+
 			jobQueue.offer(new Message.RequestMessage(piece, max_length + offset, max_length));
 		}
-		
-		
+
+
 
 	}
 	private Message.RequestMessage formRequest() {
@@ -264,7 +271,7 @@ public class Peer {
 		int offset = 0;
 
 		if ((piece = client.outfile.needPiece(bitfield)) == -1) { 
-		
+
 			interested = false;
 			return null;
 		}
@@ -277,9 +284,9 @@ public class Peer {
 		return (new Message.RequestMessage(piece, offset, max_length));
 	}
 	public void startThreads() {
-		
+
 		this.jobQueue = new ConcurrentLinkedQueue<Message>();
-		
+
 		doHandshake();
 
 		if (!checkHandshake(client.tracker.getTorrentInfo().info_hash.array())) {
@@ -288,7 +295,7 @@ public class Peer {
 			client.peerList.remove(this);
 			return;
 		}
-		 
+
 		//jobQueue.offer(new Message.BitFieldMessage(this.client.outfile.client_bitfield));
 		this.producer = new Thread(this.new Producer());
 		this.consumer = new Thread(this.new Consumer());
@@ -315,7 +322,7 @@ public class Peer {
 		this.peer_id = peer_id;
 		this.port = port;
 		this.choked = true;
-		this.peer_choking = true;
+		this.peer_choked = true;
 		this.connected = false;
 		this.interested = false;
 		this.first_sent = false;
@@ -357,22 +364,22 @@ public class Peer {
 		return port;
 	}
 
-	public void unchokeMe() {
-		choked = false;
+	public boolean isChoked() {
+		return peer_choked;
 	}
 	
-	public boolean isChoked() {
-		return choked;
+	public void setChoked( boolean b) {
+		peer_choked = b;
 	}
 	
 	public int getLastUploaded() {
 		return last_uploaded;
 	}
-	
+
 	public void setLastUploaded( int x ) {
 		last_uploaded = x;
 	}
-	
+
 	public int getLastDownloaded() {
 		return last_downloaded;
 	}
@@ -381,9 +388,7 @@ public class Peer {
 		last_downloaded = x;
 	}
 
-	public void setChoked( boolean b) {
-		choked = b;
-	}
+
 
 	public boolean listenForUnchoke() {
 
