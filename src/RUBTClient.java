@@ -16,6 +16,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -51,6 +52,22 @@ public class RUBTClient implements Runnable {
 	public List<Peer> want_unchoke;
 	public final int unchoke_limit = 3;
 	private static int unchoked_peers;
+	public List<Peer> interested_peers;
+    private List<CompleteIndex> totalCompleted;
+
+	private int unchoked;
+	public final int unchoked_limit = 3;
+
+	private class CompleteIndex {
+		public int index;
+		public int total;
+		public boolean have;
+		public CompleteIndex(int index, int total) {
+			this.index = index;
+			this.total = total;
+			this.have = false;
+		}
+	}
 
 	public class Completed {
 		public boolean first;
@@ -82,6 +99,10 @@ public class RUBTClient implements Runnable {
 		keepRunning = true;
 		seeding = false;
 		unchoked_peers = 0;
+		totalCompleted = new ArrayList<>();
+		for (int i = 0; i < outfile.completed.length; i++) {
+			totalCompleted.add(new CompleteIndex(i, 0));
+		}
 	}
 
 	/**
@@ -362,6 +383,25 @@ private static class OptimisticChoke extends TimerTask {
 	public synchronized static void incrementUnchoked() {
 		unchoked_peers++;
 	}
+	public synchronized void have(int index) {
+		totalCompleted.get(index).total++;
+	}
+
+	public synchronized void completed(int index) {
+		totalCompleted.get(index).have = true;
+	}
+
+	public synchronized int getRandomRarest(boolean[] peerCompleted) {
+		List<CompleteIndex> shuffled = new ArrayList<CompleteIndex>(totalCompleted);
+		Collections.shuffle(shuffled);
+		CompleteIndex lowest = new CompleteIndex(-1, Integer.MAX_VALUE);
+		for (int i = 0; i < shuffled.size(); i++) {
+			if (lowest.total >= shuffled.get(i).total && !shuffled.get(i).have && peerCompleted[shuffled.get(i).index])
+				lowest = shuffled.get(i);
+		}
+		return lowest.index;
+	}
+
 
 	public synchronized void decrementUnchoked() {
 		unchoked_peers--;

@@ -132,6 +132,7 @@ public class Peer {
 					System.out.println("Got have message from peer " + getPeerId());
 					Message.HaveMessage hMessage = (Message.HaveMessage)message;
 					peerCompleted[hMessage.getPieceIndex()] = true;
+					client.have(hMessage.getPieceIndex());
 					break;
 				case Message.BITFIELD_ID:
 					System.out.println("Got bitfield message from peer " + getPeerId());
@@ -145,7 +146,13 @@ public class Peer {
 					Message.BitFieldMessage bMessage = (Message.BitFieldMessage)message;
 					bitfield = bMessage.getData();
 					peerCompleted = bMessage.getCompleted();
-					
+					for (int i = 0; i <peerCompleted.length; i++) {
+						if (peerCompleted[i])
+							client.have(i);
+						else
+							System.out.println("Peer did not complete " + i);
+					}
+
 					if (client.outfile.needPiece(bitfield) != -1) {
 						interested = true;
 						peer_choked = false;
@@ -162,7 +169,7 @@ public class Peer {
 						Message piece = new Message.PieceMessage(rMessage.getIndex(), rMessage.getOffset(), data);
 						uploaded+=piece.getLength();
 						setLastUploaded(piece.getLength());
-						jobQueue.offer(piece);
+						//jobQueue.offer(piece);
 					} catch (IOException e) {
 						System.out.println(e.getMessage());
 					}
@@ -236,6 +243,7 @@ public class Peer {
 
 
 					jobQueue.offer(new Message.HaveMessage(piece));
+					client.completed(piece);
 
 					return;
 				} else {
@@ -249,6 +257,7 @@ public class Peer {
 				System.out.println("SHA SUCCESS");
 				downloaded += client.outfile.pieces[piece].getData().length;
 				jobQueue.offer(new Message.HaveMessage(piece));
+				client.completed(piece);
 
 				Message.RequestMessage m = formRequest();
 				jobQueue.offer(m);
